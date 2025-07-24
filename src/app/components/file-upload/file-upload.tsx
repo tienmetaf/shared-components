@@ -76,20 +76,36 @@ function SortableItem({file, preview, onRemove, onFileClick, disabled}: Sortable
             style={style}
             className={cn(
                 "flex items-center border rounded-md bg-background w-full max-w-full overflow-hidden",
+                "select-none", // Prevent text selection during drag
                 isDragging && "opacity-50 z-50"
             )}
+            onTouchStart={(e) => {
+                // Allow drag handle to work, but prevent other touch interactions
+                if ((e.target as HTMLElement).closest('[data-dnd-handle]')) {
+                    e.preventDefault()
+                }
+            }}
         >
             <button
                 type="button"
                 {...listeners}
                 {...attributes}
                 className={cn(
-                    "cursor-grab p-2 flex-shrink-0 hover:bg-muted touch-none",
+                    "cursor-grab p-3 flex-shrink-0 hover:bg-muted select-none",
+                    "touch-none", // Prevent default touch behaviors
                     disabled && "cursor-not-allowed opacity-50",
                     isDragging && "cursor-grabbing"
                 )}
+                style={{
+                    touchAction: 'none', // Prevent scrolling, zooming, etc.
+                }}
                 disabled={disabled}
                 aria-label="Reorder file"
+                onTouchStart={(e) => {
+                    // Prevent default touch behaviors for better drag experience
+                    e.preventDefault()
+                }}
+                data-dnd-handle="true" // Mark as drag handle for touch detection
             >
                 <GripVertical className="w-4 h-4 text-muted-foreground"/>
             </button>
@@ -185,8 +201,8 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
         }),
         useSensor(TouchSensor, {
             activationConstraint: {
-                delay: 200,
-                tolerance: 8,
+                delay: 100, // Shorter delay for better responsiveness
+                tolerance: 15, // Larger tolerance for finger touch
             },
         }),
         useSensor(KeyboardSensor, {
@@ -384,16 +400,21 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                         onDragEnd={handleDragEnd}
                     >
                         <SortableContext items={sortableItems} strategy={verticalListSortingStrategy}>
-                            {value.map((file) => (
-                                <SortableItem
-                                    key={`${file.name}-${file.size}-${file.lastModified}`}
-                                    file={file}
-                                    preview={filePreviews.get(file)}
-                                    onRemove={handleRemoveFile}
-                                    onFileClick={handleFileClick}
-                                    disabled={disabled || loading}
-                                />
-                            ))}
+                            <div
+                                className="space-y-2"
+                                style={{touchAction: 'pan-y'}} // Allow vertical scrolling but prevent horizontal pan
+                            >
+                                {value.map((file) => (
+                                    <SortableItem
+                                        key={`${file.name}-${file.size}-${file.lastModified}`}
+                                        file={file}
+                                        preview={filePreviews.get(file)}
+                                        onRemove={handleRemoveFile}
+                                        onFileClick={handleFileClick}
+                                        disabled={disabled || loading}
+                                    />
+                                ))}
+                            </div>
                         </SortableContext>
                     </DndContext>
                 </div>
