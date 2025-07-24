@@ -19,9 +19,9 @@ type FieldConfig<T extends FieldValues> = {
     disabled?: (values: T, mode: FormMode) => boolean
     readOnly?: (values: T, mode: FormMode) => boolean // New property for non-editable fields
     colSpan?: {
-        mobile?: number // e.g., 1 (col-span-1)
-        tablet?: number // e.g., 2 (md:col-span-2)
-        desktop?: number // e.g., 3 (lg:col-span-3)
+        mobile?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 // e.g., 1 (col-span-1)
+        tablet?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 // e.g., 2 (md:col-span-2)
+        desktop?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 // e.g., 3 (lg:col-span-3)
     },
     fileConfig?: {
         maxFiles?: number

@@ -79,12 +79,6 @@ function SortableItem({file, preview, onRemove, onFileClick, disabled}: Sortable
                 "select-none", // Prevent text selection during drag
                 isDragging && "opacity-50 z-50"
             )}
-            onTouchStart={(e) => {
-                // Allow drag handle to work, but prevent other touch interactions
-                if ((e.target as HTMLElement).closest('[data-dnd-handle]')) {
-                    e.preventDefault()
-                }
-            }}
         >
             <button
                 type="button"
@@ -101,10 +95,6 @@ function SortableItem({file, preview, onRemove, onFileClick, disabled}: Sortable
                 }}
                 disabled={disabled}
                 aria-label="Reorder file"
-                onTouchStart={(e) => {
-                    // Prevent default touch behaviors for better drag experience
-                    e.preventDefault()
-                }}
                 data-dnd-handle="true" // Mark as drag handle for touch detection
             >
                 <GripVertical className="w-4 h-4 text-muted-foreground"/>

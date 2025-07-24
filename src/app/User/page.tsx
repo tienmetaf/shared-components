@@ -31,21 +31,21 @@ const userFields: FieldConfig<UserFormValues>[] = [
         type: "text",
         readOnly: (values, mode) => mode === "update" || mode === "delete", // Read-only in update/delete mode
         hidden: (values, mode) => mode === "create", // Hidden in create mode
-        colSpan: { mobile: 1, tablet: 2, desktop: 3 }, // Takes full width on desktop
+        colSpan: { mobile: 6, tablet: 6, desktop: 6 }, // Takes full width on desktop
     },
     {
         name: "firstName",
         label: "First Name",
         type: "text",
         placeholder: "Enter your first name",
-        colSpan: { mobile: 1, tablet: 1, desktop: 1 },
+        colSpan: { mobile: 6, tablet: 6, desktop: 6 },
     },
     {
         name: "lastName",
         label: "Last Name",
         type: "text",
         placeholder: "Enter your last name",
-        colSpan: { mobile: 1, tablet: 1, desktop: 1 },
+        colSpan: { mobile: 6, tablet: 6, desktop: 6 },
     },
     {
         name: "email",
@@ -53,7 +53,7 @@ const userFields: FieldConfig<UserFormValues>[] = [
         type: "email",
         placeholder: "Enter your email",
         readOnly: (values, mode) => mode === "update", // Email is non-editable during update
-        colSpan: { mobile: 1, tablet: 2, desktop: 2 }, // Takes 2 columns on tablet and desktop
+        colSpan: { mobile: 6, tablet: 6, desktop: 6 }, // Takes 2 columns on tablet and desktop
     },
     {
         name: "age",
@@ -61,27 +61,27 @@ const userFields: FieldConfig<UserFormValues>[] = [
         type: "number",
         placeholder: "Enter your age",
         hidden: (values, mode) => !values.newsletter && mode !== "delete", // Hidden if newsletter is not checked, unless in delete mode
-        colSpan: { mobile: 1, tablet: 1, desktop: 1 },
+        colSpan: { mobile: 6, tablet: 6, desktop: 6  },
     },
     {
         name: "newsletter",
         label: "Subscribe to Newsletter",
         type: "checkbox",
-        colSpan: { mobile: 1, tablet: 2, desktop: 3 }, // Takes full width on desktop
+        colSpan: { mobile: 12, tablet: 12, desktop: 12 }, // Takes full width on desktop
     },
     {
         name: "notes",
         label: "Notes",
         type: "textarea",
         placeholder: "Add any notes here...",
-        colSpan: { mobile: 1, tablet: 2, desktop: 3 }, // Takes full width on desktop
+        colSpan: { mobile: 12, tablet: 12, desktop: 12 }, // Takes full width on desktop
     },
     {
         name: "files",
         label: "Files Upload",
         type: "file",
         placeholder: "Add file here...",
-        colSpan: { mobile: 1, tablet: 2, desktop: 3 },
+        colSpan: { mobile: 12, tablet: 12, desktop: 12 },
         fileConfig: {
             maxFiles: 2,
             maxFileSize: 1024 * 1024 * 1000,
