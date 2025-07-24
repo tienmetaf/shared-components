@@ -1,10 +1,13 @@
 "use client"
 
 
-import type {FieldConfig} from "@/app/components/form-builder/type"
+import type {CustomFieldRenderProps, FieldConfig} from "@/app/components/form-builder/type"
 import {toast} from "sonner"
 import z from "zod"
 import {FormBuilder} from "@/app/components/form-builder/form-builder";
+import {useState} from "react";
+import {FileUploadInput} from "@/app/components/file-upload/file-upload";
+import {Label} from "@/components/ui/label";
 
 // 1. Define Schema
 const userSchema = z.object({
@@ -15,6 +18,7 @@ const userSchema = z.object({
     age: z.number().min(18, "Must be at least 18 years old").optional(),
     newsletter: z.boolean().optional(),
     notes: z.string().optional(),
+    files: z.array(z.instanceof(File)).min(1, "At least one file is required"),
 })
 
 type UserFormValues = z.infer<typeof userSchema>
@@ -72,6 +76,18 @@ const userFields: FieldConfig<UserFormValues>[] = [
         placeholder: "Add any notes here...",
         colSpan: { mobile: 1, tablet: 2, desktop: 3 }, // Takes full width on desktop
     },
+    {
+        name: "files",
+        label: "Files Upload",
+        type: "file",
+        placeholder: "Add file here...",
+        colSpan: { mobile: 1, tablet: 2, desktop: 3 },
+        fileConfig: {
+            maxFiles: 2,
+            maxFileSize: 1024 * 1024 * 1000,
+            acceptedFileTypes: ["image/jpeg", "image/png", "application/pdf", ".zip"],
+        },
+    },
 ]
 
 export default function HomePage() {
@@ -104,6 +120,7 @@ export default function HomePage() {
 
     return (
         <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 bg-gray-50 space-y-8">
+
             {/* Create Form Example */}
             <FormBuilder
                 schema={userSchema}
@@ -112,31 +129,31 @@ export default function HomePage() {
                 title="Create New User"
                 description="Fill in the details to create a new user account."
                 mode="create"
-                defaultValues={{ newsletter: false }} // Default for create mode
+                defaultValues={{ newsletter: false, files: [] }} // Default for create mode
             />
 
-            {/* Update Form Example */}
-            <FormBuilder
-                schema={userSchema}
-                fields={userFields}
-                onSubmit={handleUpdate}
-                title="Update User Profile"
-                description="Edit user details. User ID and Email are non-editable."
-                mode="update"
-                defaultValues={existingUser}
-            />
+            {/*/!* Update Form Example *!/*/}
+            {/*<FormBuilder*/}
+            {/*    schema={userSchema}*/}
+            {/*    fields={userFields}*/}
+            {/*    onSubmit={handleUpdate}*/}
+            {/*    title="Update User Profile"*/}
+            {/*    description="Edit user details. User ID and Email are non-editable."*/}
+            {/*    mode="update"*/}
+            {/*    defaultValues={existingUser}*/}
+            {/*/>*/}
 
-            {/* Delete Form Example */}
-            <FormBuilder
-                schema={userSchema}
-                fields={userFields}
-                onSubmit={handleDelete} // onSubmit is used for the form submission
-                onDelete={handleDelete} // onDelete is specifically for the delete action
-                title="Delete User"
-                description="Review user details before confirming deletion. All fields are read-only."
-                mode="delete"
-                defaultValues={existingUser}
-            />
+            {/*/!* Delete Form Example *!/*/}
+            {/*<FormBuilder*/}
+            {/*    schema={userSchema}*/}
+            {/*    fields={userFields}*/}
+            {/*    onSubmit={handleDelete} // onSubmit is used for the form submission*/}
+            {/*    onDelete={handleDelete} // onDelete is specifically for the delete action*/}
+            {/*    title="Delete User"*/}
+            {/*    description="Review user details before confirming deletion. All fields are read-only."*/}
+            {/*    mode="delete"*/}
+            {/*    defaultValues={existingUser}*/}
+            {/*/>*/}
         </main>
     )
 }

@@ -1,7 +1,7 @@
 "use client"
 import { type DefaultValues, type FieldValues, useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import type { FormProps } from "@/app/components/form-builder/type"
+import type {CustomFieldRenderProps, FormProps} from "@/app/components/form-builder/type"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import {Textarea} from "@/components/ui/textarea";
 import {Checkbox} from "@/components/ui/checkbox";
+import {FileUploadInput} from "@/app/components/file-upload/file-upload";
 
 export function FormBuilder<T extends FieldValues>({
                                                        schema,
@@ -19,7 +20,7 @@ export function FormBuilder<T extends FieldValues>({
                                                        submitLabel,
                                                        title,
                                                        description,
-                                                       mode,
+                                                       mode
                                                    }: FormProps<T>) {
     const {
         register,
@@ -27,6 +28,8 @@ export function FormBuilder<T extends FieldValues>({
         formState: { errors },
         watch,
         control,
+        setValue,
+        getValues
     } = useForm<T>({
         resolver: zodResolver(schema),
         defaultValues: defaultValues as DefaultValues<T>,
@@ -83,6 +86,28 @@ export function FormBuilder<T extends FieldValues>({
                         )}
                     />
                 )
+                break
+            case "file":
+                const {maxFiles, maxFileSize, acceptedFileTypes} = field.fileConfig || {}
+
+                inputComponent = (
+                    <Controller
+                        name={field.name as any}
+                        control={control}
+                        render={({ field: controllerField }) => (
+                            <FileUploadInput
+                                value={controllerField.value as File[] || []} // Ensure value is always an array
+                                onChange={controllerField.onChange}
+                                maxFiles={maxFiles}
+                                maxFileSize={maxFileSize}
+                                acceptedFileTypes={acceptedFileTypes}
+                                disabled={isFieldNonEditable}
+                            />
+                        )}
+                    />
+                )
+
+                console.log({file: inputComponent})
                 break
             default:
                 inputComponent = null
