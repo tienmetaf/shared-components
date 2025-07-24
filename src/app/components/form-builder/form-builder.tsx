@@ -49,9 +49,9 @@ export function FormBuilder<T extends FieldValues>({
             mode === "delete" || field.disabled?.(values, mode) || (field.readOnly?.(values, mode) && mode === "update")
 
         const colSpanClasses = cn(
-            TailwindGridSpan.mobile[(field.colSpan?.mobile ?? 1) - 1],
-            TailwindGridSpan.tablet[(field.colSpan?.tablet ?? 1) - 1],
-            TailwindGridSpan.desktop[(field.colSpan?.desktop ?? 1) - 1],
+            TailwindGridSpan.mobile[(field.colSpan?.mobile ?? 12) - 1],
+            TailwindGridSpan.tablet[(field.colSpan?.tablet ?? 12) - 1],
+            TailwindGridSpan.desktop[(field.colSpan?.desktop ?? 12) - 1],
         )
 
         let inputComponent
@@ -78,6 +78,7 @@ export function FormBuilder<T extends FieldValues>({
                         control={control}
                         render={({ field: controllerField }) => (
                             <Checkbox
+                                id={String(field.name)}
                                 {...controllerField}
                                 checked={controllerField.value as boolean}
                                 onCheckedChange={controllerField.onChange}
