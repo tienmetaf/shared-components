@@ -1,12 +1,12 @@
 "use client"
-import { type DefaultValues, type FieldValues, useForm, Controller } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import type {CustomFieldRenderProps, FormProps} from "@/app/components/form-builder/type"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import {Controller, type DefaultValues, type FieldValues, useForm} from "react-hook-form"
+import {zodResolver} from "@hookform/resolvers/zod"
+import type {FormProps} from "@/app/components/form-builder/type"
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card"
+import {Label} from "@/components/ui/label"
+import {Input} from "@/components/ui/input"
+import {Button} from "@/components/ui/button"
+import {cn} from "@/lib/utils"
 import {Textarea} from "@/components/ui/textarea";
 import {Checkbox} from "@/components/ui/checkbox";
 import {FileUploadInput} from "@/app/components/file-upload/file-upload";
@@ -27,9 +27,7 @@ export function FormBuilder<T extends FieldValues>({
         handleSubmit,
         formState: { errors },
         watch,
-        control,
-        setValue,
-        getValues
+        control
     } = useForm<T>({
         resolver: zodResolver(schema),
         defaultValues: defaultValues as DefaultValues<T>,
@@ -66,15 +64,15 @@ export function FormBuilder<T extends FieldValues>({
             case "email":
             case "number":
             case "password":
-                inputComponent = <Input {...register(field.name as any)} type={field.type} {...commonProps} />
+                inputComponent = <Input {...register(field.name)} type={field.type} {...commonProps} />
                 break
             case "textarea":
-                inputComponent = <Textarea {...register(field.name as any)} {...commonProps} />
+                inputComponent = <Textarea {...register(field.name)} {...commonProps} />
                 break
             case "checkbox":
                 inputComponent = (
                     <Controller
-                        name={field.name as any}
+                        name={field.name}
                         control={control}
                         render={({ field: controllerField }) => (
                             <Checkbox
@@ -93,7 +91,7 @@ export function FormBuilder<T extends FieldValues>({
 
                 inputComponent = (
                     <Controller
-                        name={field.name as any}
+                        name={field.name}
                         control={control}
                         render={({ field: controllerField }) => (
                             <FileUploadInput

@@ -4,7 +4,7 @@ import type React from "react"
 import {useState, useCallback, useRef, useEffect} from "react"
 import {Button} from "@/components/ui/button"
 import {Card, CardContent} from "@/components/ui/card"
-import {X, UploadCloud, FileText, Loader2, GripVertical} from "lucide-react"
+import {X, UploadCloud, FileText, Loader2, GripVertical, AlertCircle, Trash} from "lucide-react"
 import Image from "next/image"
 import {useFileUpload, type FilePreview} from "./use-file-upload"
 import {cn} from "@/lib/utils"
@@ -26,6 +26,10 @@ import {
 import {CSS} from "@dnd-kit/utilities"
 import {arrayMove} from "@dnd-kit/sortable"
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog"
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip"
+import {Separator} from "@/components/ui/separator";
+import {useIsMobile} from "@/app/components/file-upload/use-is-mobile";
+import {Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle} from "@/components/ui/drawer";
 
 interface FileUploadInputProps {
     value: File[] // Controlled component: current files
@@ -80,29 +84,28 @@ function SortableItem({file, preview, onRemove, onFileClick, disabled}: Sortable
                 isDragging && "opacity-50 z-50"
             )}
         >
-            <button
+            <Button
                 type="button"
+                variant="ghost"
+                size="default"
                 {...listeners}
                 {...attributes}
                 className={cn(
-                    "cursor-grab p-3 flex-shrink-0 hover:bg-muted select-none",
-                    "touch-none", // Prevent default touch behaviors
+                    "cursor-grab mx-1 flex-shrink-0 hover:bg-muted select-none",
+                    "touch-none",
                     disabled && "cursor-not-allowed opacity-50",
                     isDragging && "cursor-grabbing"
                 )}
-                style={{
-                    touchAction: 'none', // Prevent scrolling, zooming, etc.
-                }}
                 disabled={disabled}
                 aria-label="Reorder file"
-                data-dnd-handle="true" // Mark as drag handle for touch detection
+                data-dnd-handle="true"
             >
-                <GripVertical className="w-4 h-4 text-muted-foreground"/>
-            </button>
+                <GripVertical className="w-5 h-5 text-muted-foreground"/>
+            </Button>
 
             <div
                 className={cn(
-                    "flex items-center gap-2 flex-grow min-w-0",
+                    "flex items-center gap-2 flex-grow min-w-0 py-2",
                     preview?.type === "image" && !isDragging && "cursor-pointer"
                 )}
                 onClick={handleFileClick}
@@ -123,7 +126,7 @@ function SortableItem({file, preview, onRemove, onFileClick, disabled}: Sortable
                     </div>
                 )}
 
-                <div className="flex-1 min-w-0 px-2 py-2">
+                <div className="flex-1 min-w-0 pr-1 ">
                     <div className="truncate text-sm font-medium" title={file.name}>
                         {file.name}
                     </div>
@@ -133,19 +136,21 @@ function SortableItem({file, preview, onRemove, onFileClick, disabled}: Sortable
                 </div>
             </div>
 
+            <Separator orientation="vertical" className="min-h-8"/>
+
             <Button
                 type="button"
                 variant="ghost"
-                size="sm"
+                size="default"
                 onClick={(e) => {
                     e.stopPropagation()
                     onRemove(file)
                 }}
-                className="flex-shrink-0 h-full rounded-none px-3 border-l hover:bg-muted"
+                className="flex-shrink-0 px-2 mx-1 hover:bg-red-500 hover:text-white"
                 disabled={disabled}
                 aria-label={`Remove ${file.name}`}
             >
-                <X className="w-4 h-4"/>
+                <Trash className="w-5 h-5"/>
             </Button>
         </div>
     )
@@ -154,7 +159,7 @@ function SortableItem({file, preview, onRemove, onFileClick, disabled}: Sortable
 export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                                                                     value,
                                                                     onChange,
-                                                                    maxFiles,
+                                                                    maxFiles = 10,
                                                                     maxFileSize,
                                                                     acceptedFileTypes,
                                                                     disabled,
@@ -165,7 +170,13 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
     const [selectedFileForPreview, setSelectedFileForPreview] = useState<File | null>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [isDraggingItem, setIsDraggingItem] = useState(false)
+    const [showLimitTooltip, setShowLimitTooltip] = useState(false)
+    const isMobile = useIsMobile();
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    // Check if files limit is reached
+    const isLimitReached = value.length >= maxFiles
+    const isSingleFile = maxFiles === 1
 
     // Cleanup preview URL on unmount
     useEffect(() => {
@@ -204,14 +215,22 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
     const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault()
         e.stopPropagation()
+
+        // Don't allow drop if limit reached and not single file mode
+        if (isLimitReached && !isSingleFile) {
+            setShowLimitTooltip(true)
+            return
+        }
+
         setIsDraggingOver(true)
-    }, [])
+    }, [isLimitReached, isSingleFile])
 
     // Handle drag leave event for styling
     const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault()
         e.stopPropagation()
         setIsDraggingOver(false)
+        setShowLimitTooltip(false)
     }, [])
 
     // Handle file drop event
@@ -220,25 +239,43 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
             e.preventDefault()
             e.stopPropagation()
             setIsDraggingOver(false)
+            setShowLimitTooltip(false)
 
-            if (disabled || loading) return
+            if (disabled || loading || (isLimitReached && !isSingleFile)) return
 
             const filesToProcess = e.dataTransfer.files
             if (filesToProcess.length === 0) return
 
             const {validFiles, newErrors} = validateAndProcessFiles(filesToProcess)
 
-            // Combine existing files with new valid files
-            let updatedFiles = [...value, ...validFiles]
+            if (isSingleFile) {
+                // Replace current file with the first valid file
+                if (validFiles.length > 0) {
+                    // Revoke existing file preview URLs
+                    value.forEach(file => {
+                        const preview = filePreviews.get(file)
+                        if (preview && preview.url) {
+                            revokeObjectURL(preview.url)
+                        }
+                    })
+                    onChange([validFiles[0]])
+                }
+            } else {
+                // Don't allow adding if limit reached
+                if (isLimitReached) return
 
-            // Handle maxFiles limit
-            if (maxFiles && updatedFiles.length > maxFiles) {
-                updatedFiles = updatedFiles.slice(0, maxFiles)
+                // Combine existing files with new valid files
+                let updatedFiles = [...value, ...validFiles]
+
+                // Handle maxFiles limit
+                if (updatedFiles.length > maxFiles) {
+                    updatedFiles = updatedFiles.slice(0, maxFiles)
+                }
+
+                onChange(updatedFiles)
             }
-
-            onChange(updatedFiles)
         },
-        [disabled, loading, validateAndProcessFiles, value, maxFiles, onChange],
+        [disabled, loading, validateAndProcessFiles, value, maxFiles, onChange, isSingleFile, isLimitReached, filePreviews, revokeObjectURL],
     )
 
     // Handle file selection via input
@@ -251,20 +288,34 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
 
             const {validFiles, newErrors} = validateAndProcessFiles(filesToProcess)
 
-            let updatedFiles = [...value, ...validFiles]
+            if (isSingleFile) {
+                // Replace current file with the first valid file
+                if (validFiles.length > 0) {
+                    // Revoke existing file preview URLs
+                    value.forEach(file => {
+                        const preview = filePreviews.get(file)
+                        if (preview && preview.url) {
+                            revokeObjectURL(preview.url)
+                        }
+                    })
+                    onChange([validFiles[0]])
+                }
+            } else {
+                let updatedFiles = [...value, ...validFiles]
 
-            if (maxFiles && updatedFiles.length > maxFiles) {
-                updatedFiles = updatedFiles.slice(0, maxFiles)
+                if (updatedFiles.length > maxFiles) {
+                    updatedFiles = updatedFiles.slice(0, maxFiles)
+                }
+
+                onChange(updatedFiles)
             }
-
-            onChange(updatedFiles)
 
             // Clear the input value to allow selecting the same file again
             if (fileInputRef.current) {
                 fileInputRef.current.value = ""
             }
         },
-        [disabled, loading, validateAndProcessFiles, value, maxFiles, onChange],
+        [disabled, loading, validateAndProcessFiles, value, maxFiles, onChange, isSingleFile, filePreviews, revokeObjectURL],
     )
 
     // Handle file removal
@@ -326,135 +377,236 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
         }
     }, [isDraggingItem])
 
+    // Handle browse files click
+    const handleBrowseClick = useCallback(() => {
+        if (disabled || loading || (isLimitReached && !isSingleFile)) return
+        fileInputRef.current?.click()
+    }, [disabled, loading, isLimitReached, isSingleFile])
+
     // Generate unique IDs for dnd-kit items based on file properties
     const sortableItems = value.map((file) => `${file.name}-${file.size}-${file.lastModified}`)
 
+    const getLimitMessage = () => {
+        if (isSingleFile) {
+            return "Only 1 file allowed. New file will replace current file."
+        }
+        return `Maximum ${maxFiles} files allowed. Limit reached.`
+    }
+
     return (
-        <div className={cn("w-full max-w-full overflow-hidden", className)}>
-            <Card
-                className={cn(
-                    "border-2 border-dashed shadow-none transition-colors w-full",
-                    isDraggingOver ? "border-primary bg-primary/5" : "border-muted-foreground/20",
-                    (disabled || loading) && "opacity-50 cursor-not-allowed",
-                )}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-            >
-                <CardContent className="flex flex-col items-center justify-center p-6 text-center">
-                    {loading ? (
-                        <Loader2 className="h-8 w-8 animate-spin text-primary"/>
-                    ) : (
-                        <UploadCloud className="h-8 w-8 text-muted-foreground"/>
-                    )}
-                    <p className="mt-2 text-sm text-muted-foreground">
-                        {loading ? "Processing files..." : "Drag & drop files here or"}
-                    </p>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        className="mt-4 bg-transparent"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={disabled || loading}
-                    >
-                        Browse Files
-                    </Button>
-                    <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileChange}
-                        className="hidden"
-                        multiple={maxFiles === 1 ? false : true} // Allow multiple if maxFiles > 1
-                        accept={acceptedFileTypes?.join(",")}
-                        disabled={disabled || loading}
-                    />
-                </CardContent>
-            </Card>
+        <TooltipProvider>
+            <div className={cn("w-full max-w-full overflow-hidden", className)}>
+                <Tooltip open={showLimitTooltip && isLimitReached && !isSingleFile}>
+                    <TooltipTrigger asChild>
+                        <Card
+                            className={cn(
+                                "border-2 border-dashed shadow-none transition-all duration-200 w-full",
+                                isDraggingOver && !isLimitReached ? "border-primary bg-primary/5" : "border-muted-foreground/20",
+                                (disabled || loading) && "opacity-50 cursor-not-allowed",
+                                showLimitTooltip && "border-destructive bg-destructive/10"
+                            )}
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                            onMouseEnter={() => {
+                                if (isLimitReached && !isSingleFile) {
+                                    setShowLimitTooltip(true)
+                                }
+                            }}
+                            onMouseLeave={() => setShowLimitTooltip(false)}
+                        >
+                            <CardContent className="flex flex-col items-center justify-center p-6 text-center">
+                                {loading ? (
+                                    <Loader2 className="h-8 w-8 animate-spin text-primary"/>
+                                ) : (
+                                    <UploadCloud className="h-8 w-8 text-muted-foreground"/>
+                                )}
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                    {loading ? "Processing files..." :
+                                        "Drag & drop files here or"}
+                                </p>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="mt-4 bg-transparent"
+                                    onClick={handleBrowseClick}
+                                    disabled={disabled || loading || (isLimitReached && !isSingleFile)}
+                                >
+                                    Browse Files
+                                </Button>
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleFileChange}
+                                    className="hidden"
+                                    multiple={!isSingleFile} // Allow multiple if not single file mode
+                                    accept={acceptedFileTypes?.join(",")}
+                                    disabled={disabled || loading}
+                                />
 
-            {errors.length > 0 && (
-                <div className="mt-2 w-full">
-                    {errors.map((error, index) => (
-                        <p key={index} className="text-sm text-destructive">
-                            {error}
-                        </p>
-                    ))}
-                </div>
-            )}
+                                {/* File count display */}
+                                <div className="mt-3 text-xs text-muted-foreground">
+                                    <span className={cn(
+                                        "transition-colors duration-200",
+                                        isLimitReached && "text-destructive font-medium"
+                                    )}>
+                                        Selected {value.length} / {maxFiles} files
+                                    </span>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                        <p className="text-sm">{getLimitMessage()}</p>
+                    </TooltipContent>
+                </Tooltip>
 
-            {value.length > 0 && (
-                <div className="mt-2 space-y-2 w-full max-w-full">
-                    <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragStart={handleDragStart}
-                        onDragEnd={handleDragEnd}
-                    >
-                        <SortableContext items={sortableItems} strategy={verticalListSortingStrategy}>
-                            <div
-                                className="space-y-2"
-                                style={{touchAction: 'pan-y'}} // Allow vertical scrolling but prevent horizontal pan
-                            >
-                                {value.map((file) => (
-                                    <SortableItem
-                                        key={`${file.name}-${file.size}-${file.lastModified}`}
-                                        file={file}
-                                        preview={filePreviews.get(file)}
-                                        onRemove={handleRemoveFile}
-                                        onFileClick={handleFileClick}
-                                        disabled={disabled || loading}
-                                    />
-                                ))}
+                {errors.length > 0 && (
+                    <div className="mt-3 w-full space-y-1">
+                        {errors.map((error, index) => (
+                            <div key={index}
+                                 className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-2 rounded-md">
+                                <AlertCircle className="w-4 h-4 flex-shrink-0"/>
+                                <span>{error}</span>
                             </div>
-                        </SortableContext>
-                    </DndContext>
-                </div>
-            )}
+                        ))}
+                    </div>
+                )}
 
-            <Dialog
-                open={!!selectedFileForPreview}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        // Cleanup URL when closing dialog
-                        if (previewUrl) {
-                            URL.revokeObjectURL(previewUrl)
-                            setPreviewUrl(null)
-                        }
-                        setSelectedFileForPreview(null)
-                    }
-                }}
-            >
-                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>{selectedFileForPreview?.name}</DialogTitle>
-                        <DialogDescription>
-                            Size: {selectedFileForPreview ? (selectedFileForPreview.size / (1024 * 1024)).toFixed(2) : 0} MB
-                            {selectedFileForPreview?.type && ` | Type: ${selectedFileForPreview.type}`}
-                        </DialogDescription>
-                    </DialogHeader>
-                    {selectedFileForPreview?.type.startsWith('image/') && previewUrl ? (
-                        <div className="relative w-full h-auto max-h-[70vh] overflow-hidden flex items-center justify-center bg-muted rounded-md">
-                            <Image
-                                src={previewUrl}
-                                alt={selectedFileForPreview.name}
-                                width={500}
-                                height={400}
-                                style={{maxWidth: "100%", maxHeight: "70vh", objectFit: "contain"}}
-                                className="rounded-md"
-                                unoptimized
-                                onError={() => {
-                                    console.error('Image load error for:', selectedFileForPreview.name)
-                                }}
-                            />
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center p-8 bg-muted rounded-md text-muted-foreground">
-                            <FileText className="w-16 h-16 mb-4"/>
-                            <p className="text-lg font-medium">No preview available for this file type.</p>
-                            <p className="text-sm">File Name: {selectedFileForPreview?.name}</p>
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
-        </div>
+                {value.length > 0 && (
+                    <div className="mt-4 space-y-3 w-full max-w-full">
+                        <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragStart={handleDragStart}
+                            onDragEnd={handleDragEnd}
+                        >
+                            <SortableContext items={sortableItems} strategy={verticalListSortingStrategy}>
+                                <div
+                                    className="space-y-3"
+                                    style={{touchAction: 'pan-y'}} // Allow vertical scrolling but prevent horizontal pan
+                                >
+                                    {value.map((file) => (
+                                        <SortableItem
+                                            key={`${file.name}-${file.size}-${file.lastModified}`}
+                                            file={file}
+                                            preview={filePreviews.get(file)}
+                                            onRemove={handleRemoveFile}
+                                            onFileClick={handleFileClick}
+                                            disabled={disabled || loading}
+                                        />
+                                    ))}
+                                </div>
+                            </SortableContext>
+                        </DndContext>
+                    </div>
+                )}
+
+                {isMobile ? (
+                    <Drawer
+                        open={!!selectedFileForPreview}
+                        onOpenChange={(open) => {
+                            if (!open) {
+                                if (previewUrl) {
+                                    URL.revokeObjectURL(previewUrl);
+                                    setPreviewUrl(null);
+                                }
+                                setSelectedFileForPreview(null);
+                            }
+                        }}
+                    >
+                        <DrawerContent className="max-h-[90vh] overflow-y-auto">
+                            <DrawerHeader>
+                                <DrawerTitle className="truncate leading-6"
+                                             title={selectedFileForPreview?.name || "File Preview"}>
+                                    {selectedFileForPreview?.name}
+                                </DrawerTitle>
+                                <DrawerDescription>
+                                    Size: {selectedFileForPreview ? (selectedFileForPreview.size / (1024 * 1024)).toFixed(2) : 0} MB
+                                    {selectedFileForPreview?.type && ` | Type: ${selectedFileForPreview.type}`}
+                                </DrawerDescription>
+                            </DrawerHeader>
+                            {selectedFileForPreview?.type.startsWith('image/') && previewUrl ? (
+                                <div
+                                    className="relative w-full h-auto max-h-[70vh] flex items-center justify-center bg-muted rounded-lg">
+                                    <Image
+                                        src={previewUrl}
+                                        alt={selectedFileForPreview.name}
+                                        width={700}
+                                        height={500}
+                                        style={{maxWidth: "100%", maxHeight: "70vh", objectFit: "contain"}}
+                                        className="rounded-t-lg"
+                                        unoptimized
+                                        onError={() => {
+                                            console.error('Image load error for:', selectedFileForPreview.name);
+                                        }}
+                                    />
+                                </div>
+                            ) : (
+                                <div
+                                    className="flex flex-col items-center justify-center p-12 bg-muted rounded-lg text-muted-foreground">
+                                    <FileText className="w-20 h-20 mb-4"/>
+                                    <p className="text-lg font-medium">No preview available for this file type.</p>
+                                    <p className="text-sm mt-2">File Name: {selectedFileForPreview?.name}</p>
+                                </div>
+                            )}
+                        </DrawerContent>
+                    </Drawer>
+                ) : (
+                    <Dialog
+                        open={!!selectedFileForPreview}
+                        onOpenChange={(open) => {
+                            if (!open) {
+                                // Cleanup URL when closing dialog
+                                if (previewUrl) {
+                                    URL.revokeObjectURL(previewUrl)
+                                    setPreviewUrl(null)
+                                }
+                                setSelectedFileForPreview(null)
+                            }
+                        }}
+                    >
+                        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+                            <DialogHeader className="w-full overflow-hidden">
+                                <DialogTitle
+                                    className="truncate leading-6"
+                                    title={selectedFileForPreview?.name || "File Preview"}
+                                >
+                                    {selectedFileForPreview?.name}
+                                </DialogTitle>
+                                <DialogDescription>
+                                    Size: {selectedFileForPreview ? (selectedFileForPreview.size / (1024 * 1024)).toFixed(2) : 0} MB
+                                    {selectedFileForPreview?.type && ` | Type: ${selectedFileForPreview.type}`}
+                                </DialogDescription>
+                            </DialogHeader>
+                            {selectedFileForPreview?.type.startsWith('image/') && previewUrl ? (
+                                <div
+                                    className="relative w-full h-auto max-h-[70vh] overflow-hidden flex items-center justify-center bg-muted rounded-lg">
+                                    <Image
+                                        src={previewUrl}
+                                        alt={selectedFileForPreview.name}
+                                        width={700}
+                                        height={500}
+                                        style={{maxWidth: "100%", maxHeight: "70vh", objectFit: "contain"}}
+                                        className="rounded-lg"
+                                        unoptimized
+                                        onError={() => {
+                                            console.error('Image load error for:', selectedFileForPreview.name)
+                                        }}
+                                    />
+                                </div>
+                            ) : (
+                                <div
+                                    className="flex flex-col items-center justify-center p-12 bg-muted rounded-lg text-muted-foreground">
+                                    <FileText className="w-20 h-20 mb-4"/>
+                                    <p className="text-lg font-medium">No preview available for this file type.</p>
+                                    <p className="text-sm mt-2">File Name: {selectedFileForPreview?.name}</p>
+                                </div>
+                            )}
+                        </DialogContent>
+                    </Dialog>
+                )}
+            </div>
+        </TooltipProvider>
     )
 }

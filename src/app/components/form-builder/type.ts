@@ -1,7 +1,7 @@
 import type {
     Control,
     FieldErrors,
-    FieldValues,
+    FieldValues, Path,
     SubmitHandler,
     UseFormGetValues,
     UseFormRegister, UseFormSetValue,
@@ -10,25 +10,37 @@ import type {
 
 export type FormMode = "create" | "update" | "delete"
 
-type FieldConfig<T extends FieldValues> = {
-    name: keyof T
+type CommonFieldConfig<T extends FieldValues> = {
+    name: Path<T>
     label: string
-    type: "text" | "email" | "number" | "password" | "checkbox" | "textarea" | "custom" | "file"
     placeholder?: string
     hidden?: (values: T, mode: FormMode) => boolean
     disabled?: (values: T, mode: FormMode) => boolean
-    readOnly?: (values: T, mode: FormMode) => boolean // New property for non-editable fields
+    readOnly?: (values: T, mode: FormMode) => boolean
     colSpan?: {
-        mobile?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 // e.g., 1 (col-span-1)
-        tablet?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 // e.g., 2 (md:col-span-2)
-        desktop?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 // e.g., 3 (lg:col-span-3)
-    },
-    fileConfig?: {
-        maxFiles?: number
-        maxFileSize?: number // in bytes
-        acceptedFileTypes?: string[] // e.g., ['image/jpeg', 'image/png', '.pdf']
+        mobile?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
+        tablet?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
+        desktop?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
     }
 }
+
+type BasicFieldType = "text" | "email" | "number" | "password" | "checkbox" | "textarea" | "custom"
+
+type BasicFieldConfig<T extends FieldValues> = CommonFieldConfig<T> & {
+    type: BasicFieldType
+    fileConfig?: never
+}
+
+type FileFieldConfig<T extends FieldValues> = CommonFieldConfig<T> & {
+    type: "file"
+    fileConfig: {
+        maxFiles?: number
+        maxFileSize?: number // in bytes
+        acceptedFileTypes?: string[]
+    }
+}
+
+type FieldConfig<T extends FieldValues> = BasicFieldConfig<T> | FileFieldConfig<T>
 
 // Props passed to the custom render function
 export type CustomFieldRenderProps<T extends FieldValues> = {
