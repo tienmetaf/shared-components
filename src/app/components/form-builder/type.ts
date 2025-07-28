@@ -28,7 +28,6 @@ type BasicFieldType = "text" | "email" | "number" | "password" | "checkbox" | "t
 
 type BasicFieldConfig<T extends FieldValues> = CommonFieldConfig<T> & {
     type: BasicFieldType
-    fileConfig?: never
 }
 
 type FileFieldConfig<T extends FieldValues> = CommonFieldConfig<T> & {

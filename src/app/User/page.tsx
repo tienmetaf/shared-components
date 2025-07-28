@@ -8,40 +8,6 @@ import {FormBuilder} from "@/app/components/form-builder/form-builder";
 import {useState} from "react";
 import {FileUploadInput} from "@/app/components/file-upload/file-upload";
 import {Label} from "@/components/ui/label";
-import {TreeNode} from "@/app/components/tree";
-
-const sampleTreeData: TreeNode[] = [
-    {
-        id: '1',
-        label: 'Documents',
-        children: [
-            {
-                id: '1-1',
-                label: 'Work',
-                children: [
-                    { id: '1-1-1', label: 'Report.pdf' },
-                    { id: '1-1-2', label: 'Presentation.pptx' }
-                ]
-            },
-            {
-                id: '1-2',
-                label: 'Personal',
-                children: [
-                    { id: '1-2-1', label: 'Photos' },
-                    { id: '1-2-2', label: 'Videos' }
-                ]
-            }
-        ]
-    },
-    {
-        id: '2',
-        label: 'Downloads',
-        children: [
-            { id: '2-1', label: 'Software' },
-            { id: '2-2', label: 'Media' }
-        ]
-    }
-]
 
 // 1. Define Schema
 const userSchema = z.object({
@@ -53,20 +19,6 @@ const userSchema = z.object({
     newsletter: z.boolean().optional(),
     notes: z.string().optional(),
     files: z.array(z.instanceof(File)).min(1, "At least one file is required"),
-    selectedFolders: z.array(z.string()).optional(),
-    folderStructure: z.array(z.object({
-        id: z.string(),
-        label: z.string(),
-        children: z.array(z.lazy(() => z.object({
-            id: z.string(),
-            label: z.string(),
-            children: z.array(z.lazy(() => z.object({
-                id: z.string(),
-                label: z.string()
-            })))
-        }))).optional()
-    })).optional()
-
 })
 
 type UserFormValues = z.infer<typeof userSchema>
@@ -136,47 +88,6 @@ const userFields: FieldConfig<UserFormValues>[] = [
             acceptedFileTypes: ["image/jpeg", "image/png", "application/pdf", ".zip"],
         },
     },
-    {
-        name: 'selectedFolders',
-        label: 'Select Folders',
-        type: 'tree',
-        treeConfig: {
-            name: 'selectedFolders',
-            label: 'Select Folders',
-            data: sampleTreeData,
-            config: {
-                selectionMode: 'multiple',
-                collapsible: true,
-                showCheckboxes: true,
-                showIcons: true
-            }
-        },
-        colSpan: { mobile: 12 }
-    },
-    {
-        name: 'folderStructure',
-        label: 'Organize Folder Structure',
-        type: 'sortable-tree',
-        treeConfig: {
-            name: 'folderStructure',
-            label: 'Organize Folder Structure',
-            data: sampleTreeData,
-            config: {
-                collapsible: true,
-                removable: true,
-                showMoveButtons: true,
-                showDropIndicator: true,
-                showIcons: true,
-                onRemove: (nodeId) => {
-                    console.log('Node removed:', nodeId)
-                },
-                onMove: (nodeId, direction) => {
-                    console.log('Node moved:', nodeId, direction)
-                }
-            }
-        },
-        colSpan: { mobile: 12 }
-    }
 ]
 
 export default function HomePage() {
