@@ -1,13 +1,9 @@
 "use client"
 
-
-import type {CustomFieldRenderProps, FieldConfig} from "@/app/components/form-builder/type"
+import type {FieldConfig} from "@/app/components/form-builder/type"
 import {toast} from "sonner"
 import z from "zod"
 import {FormBuilder} from "@/app/components/form-builder/form-builder";
-import {useState} from "react";
-import {FileUploadInput} from "@/app/components/file-upload/file-upload";
-import {Label} from "@/components/ui/label";
 
 // 1. Define Schema
 const userSchema = z.object({
@@ -19,6 +15,7 @@ const userSchema = z.object({
     newsletter: z.boolean().optional(),
     notes: z.string().optional(),
     files: z.array(z.instanceof(File)).min(1, "At least one file is required"),
+    birthday: z.string().optional(),
 })
 
 type UserFormValues = z.infer<typeof userSchema>
@@ -31,21 +28,21 @@ const userFields: FieldConfig<UserFormValues>[] = [
         type: "text",
         readOnly: (values, mode) => mode === "update" || mode === "delete", // Read-only in update/delete mode
         hidden: (values, mode) => mode === "create", // Hidden in create mode
-        colSpan: { mobile: 6, tablet: 6, desktop: 6 }, // Takes full width on desktop
+        colSpan: {mobile: 6, tablet: 6, desktop: 6}, // Takes full width on desktop
     },
     {
         name: "firstName",
         label: "First Name",
         type: "text",
         placeholder: "Enter your first name",
-        colSpan: { mobile: 6, tablet: 6, desktop: 6 },
+        colSpan: {mobile: 6, tablet: 6, desktop: 6},
     },
     {
         name: "lastName",
         label: "Last Name",
         type: "text",
         placeholder: "Enter your last name",
-        colSpan: { mobile: 6, tablet: 6, desktop: 6 },
+        colSpan: {mobile: 6, tablet: 6, desktop: 6},
     },
     {
         name: "email",
@@ -53,7 +50,7 @@ const userFields: FieldConfig<UserFormValues>[] = [
         type: "email",
         placeholder: "Enter your email",
         readOnly: (values, mode) => mode === "update", // Email is non-editable during update
-        colSpan: { mobile: 6, tablet: 6, desktop: 6 }, // Takes 2 columns on tablet and desktop
+        colSpan: {mobile: 6, tablet: 6, desktop: 6}, // Takes 2 columns on tablet and desktop
     },
     {
         name: "age",
@@ -61,33 +58,49 @@ const userFields: FieldConfig<UserFormValues>[] = [
         type: "number",
         placeholder: "Enter your age",
         hidden: (values, mode) => !values.newsletter && mode !== "delete", // Hidden if newsletter is not checked, unless in delete mode
-        colSpan: { mobile: 6, tablet: 6, desktop: 6  },
+        colSpan: {mobile: 6, tablet: 6, desktop: 6},
     },
     {
         name: "newsletter",
         label: "Subscribe to Newsletter",
         type: "checkbox",
-        colSpan: { mobile: 12, tablet: 12, desktop: 12 }, // Takes full width on desktop
+        colSpan: {mobile: 12, tablet: 12, desktop: 12}, // Takes full width on desktop
     },
     {
         name: "notes",
         label: "Notes",
         type: "textarea",
         placeholder: "Add any notes here...",
-        colSpan: { mobile: 12, tablet: 12, desktop: 12 }, // Takes full width on desktop
+        colSpan: {mobile: 12, tablet: 12, desktop: 12}, // Takes full width on desktop
     },
     {
         name: "files",
         label: "Files Upload",
         type: "file",
         placeholder: "Add file here...",
-        colSpan: { mobile: 12, tablet: 12, desktop: 12 },
+        colSpan: {mobile: 12, tablet: 12, desktop: 12},
         fileConfig: {
             maxFiles: 2,
             maxFileSize: 1024 * 1024 * 1000,
             acceptedFileTypes: ["image/jpeg", "image/png", "application/pdf", ".zip"],
         },
     },
+    {
+        name: "birthday",
+        label: "Birthday",
+        type: "custom",
+        colSpan: {mobile: 6, tablet: 6, desktop: 6},
+        render: ({field}) => {
+            const { value, ...rest } = field;
+            return (
+                <input
+                    type="date"
+                    {...rest}
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+            )
+        },
+    }
 ]
 
 export default function HomePage() {
@@ -96,16 +109,16 @@ export default function HomePage() {
         console.log("Create data:", data)
         toast.success("User created successfully!")
     }
-
-    const handleUpdate = (data: UserFormValues) => {
-        console.log("Update data:", data)
-        toast.success("User updated successfully!")
-    }
-
-    const handleDelete = (data: UserFormValues) => {
-        console.log("Delete data:", data)
-        toast.success("User deleted successfully!")
-    }
+    //
+    // const handleUpdate = (data: UserFormValues) => {
+    //     console.log("Update data:", data)
+    //     toast.success("User updated successfully!")
+    // }
+    //
+    // const handleDelete = (data: UserFormValues) => {
+    //     console.log("Delete data:", data)
+    //     toast.success("User deleted successfully!")
+    // }
 
     // Example existing user data for update/delete modes
     const existingUser = {
@@ -129,7 +142,7 @@ export default function HomePage() {
                 title="Create New User"
                 description="Fill in the details to create a new user account."
                 mode="create"
-                defaultValues={{ newsletter: false, files: [] }} // Default for create mode
+                defaultValues={{newsletter: false, files: []}} // Default for create mode
             />
 
             {/*/!* Update Form Example *!/*/}

@@ -10,6 +10,7 @@ import {cn} from "@/lib/utils"
 import {Textarea} from "@/components/ui/textarea";
 import {Checkbox} from "@/components/ui/checkbox";
 import {FileUploadInput} from "@/app/components/file-upload/file-upload";
+import {JSX} from "react";
 
 export function FormBuilder<T extends FieldValues>({
                                                        schema,
@@ -52,7 +53,8 @@ export function FormBuilder<T extends FieldValues>({
             TailwindGridSpan.desktop[(field.colSpan?.desktop ?? 12) - 1],
         )
 
-        let inputComponent
+        let inputComponent: JSX.Element;
+
         const commonProps = {
             id: String(field.name),
             placeholder: field.placeholder,
@@ -85,6 +87,7 @@ export function FormBuilder<T extends FieldValues>({
                         )}
                     />
                 )
+                console.log("checkbock", inputComponent)
                 break
             case "file":
                 const {maxFiles, maxFileSize, acceptedFileTypes} = field.fileConfig || {}
@@ -108,8 +111,19 @@ export function FormBuilder<T extends FieldValues>({
 
                 console.log({file: inputComponent})
                 break
+            case "custom":
+                inputComponent = (
+                    <Controller
+                        name={field.name}
+                        control={control}
+                        render={({ field: f, fieldState, formState }) => {
+                            return field.render({ field: f, fieldState, formState  })
+                        }}
+                    />
+                )
+                break
             default:
-                inputComponent = null
+                inputComponent = <></>
         }
 
         // Special rendering for checkbox to place label next to it
