@@ -57,7 +57,11 @@ const userFields: FieldConfig<UserFormValues>[] = [
         label: "Age",
         type: "number",
         placeholder: "Enter your age",
-        hidden: (values, mode) => !values.newsletter && mode !== "delete", // Hidden if newsletter is not checked, unless in delete mode
+        hidden: (values, mode) => {
+            console.log("age hidden check", values, mode);
+            return !values.newsletter && mode !== "delete";
+        },
+        deps: ['newsletter'],
         colSpan: {mobile: 6, tablet: 6, desktop: 6},
     },
     {
