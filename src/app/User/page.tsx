@@ -11,7 +11,7 @@ const userSchema = z.object({
     firstName: z.string().min(1, "First name is required"),
     lastName: z.string().min(1, "Last name is required"),
     email: z.string().email("Invalid email address"),
-    age: z.number().min(18, "Must be at least 18 years old").optional(),
+    age: z.string().optional(),
     newsletter: z.boolean().optional(),
     notes: z.string().optional(),
     files: z.array(z.instanceof(File)).min(1, "At least one file is required"),
@@ -55,7 +55,7 @@ const userFields: FieldConfig<UserFormValues>[] = [
     {
         name: "age",
         label: "Age",
-        type: "number",
+        type: "text",
         placeholder: "Enter your age",
         hidden: (values, mode) => {
             console.log("age hidden check", values, mode);
@@ -125,15 +125,15 @@ export default function HomePage() {
     // }
 
     // Example existing user data for update/delete modes
-    const existingUser = {
-        id: "user-123",
-        firstName: "John",
-        lastName: "Doe",
-        email: "john.doe@example.com",
-        age: 30,
-        newsletter: true,
-        notes: "This is an existing user.",
-    }
+    // const existingUser = {
+    //     id: "user-123",
+    //     firstName: "John",
+    //     lastName: "Doe",
+    //     email: "john.doe@example.com",
+    //     age: 30,
+    //     newsletter: true,
+    //     notes: "This is an existing user.",
+    // }
 
     return (
         <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 bg-gray-50 space-y-8">

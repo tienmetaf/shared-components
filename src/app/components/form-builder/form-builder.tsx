@@ -22,15 +22,8 @@ export function FormBuilder<T extends FieldValues>({
         defaultValues: defaultValues as DefaultValues<T>,
     })
 
-    const {
-        register,
-        handleSubmit,
-        formState: {errors},
-        watch,
-        control
-    } = useFormReturn
+    const { handleSubmit } = useFormReturn
 
-    // Determine the effective submit label
     let effectiveSubmitLabel = submitLabel
     if (!effectiveSubmitLabel) {
         if (mode === "create") effectiveSubmitLabel = "Create"
@@ -56,9 +49,8 @@ export function FormBuilder<T extends FieldValues>({
                         <FieldItem
                             key={f.name}
                             field={f as FieldConfig<FieldValues>}
-                            rf={useFormReturn as UseFormReturn<FieldValues, any, FieldValues>}
+                            rf={useFormReturn as UseFormReturn<FieldValues, unknown, FieldValues>}
                             mode={mode}
-                            errorMsg={(errors[f.name]?.message as string) || undefined}
                         />
                     ))}
                     <div className="col-span-full flex justify-end mt-4">

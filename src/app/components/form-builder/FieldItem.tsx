@@ -13,12 +13,11 @@ type FieldItemProps<T extends FieldValues> = {
     field: FieldConfig<T>;
     rf: UseFormReturn<T>;
     mode: "create" | "update" | "delete";
-    errorMsg?: string;
 };
 
-export const FieldItem = memo(function FieldItem<T extends FieldValues>({field, rf, mode, errorMsg}: FieldItemProps<T>) {
-    const {register, control, formState: {errors}} = rf;
-    const deps = field.deps ?? [];
+export const FieldItem = memo(function FieldItem<T extends FieldValues>({field, rf, mode}: FieldItemProps<T>) {
+    const { register, control, formState: {errors} } = rf;
+    const deps = useMemo(() => field.deps ?? [], [field.deps]);
 
     const depValuesArray = useWatch({control, name: deps.length ? deps : []});
 
@@ -27,7 +26,7 @@ export const FieldItem = memo(function FieldItem<T extends FieldValues>({field, 
         const obj: Record<string, unknown> = {};
         deps.forEach((name, i) => (obj[name as string] = Array.isArray(depValuesArray) ? depValuesArray[i] : undefined));
         return obj as Partial<T>;
-    }, [JSON.stringify(depValuesArray)]);
+    }, [depValuesArray, deps]);
 
     const hidden = field.hidden?.(depValues, mode) ?? false;
     if (hidden) return null;
@@ -76,7 +75,6 @@ export const FieldItem = memo(function FieldItem<T extends FieldValues>({field, 
                     )}
                 />
             )
-            console.log("checkbock", inputComponent)
             break
         case "file":
             const {maxFiles, maxFileSize, acceptedFileTypes} = field.fileConfig || {}
@@ -87,7 +85,7 @@ export const FieldItem = memo(function FieldItem<T extends FieldValues>({field, 
                     control={control}
                     render={({ field: controllerField }) => (
                         <FileUploadInput
-                            value={controllerField.value as File[] || []} // Ensure value is always an array
+                            value={controllerField.value as File[] || []}
                             onChange={controllerField.onChange}
                             maxFiles={maxFiles}
                             maxFileSize={maxFileSize}
@@ -97,8 +95,6 @@ export const FieldItem = memo(function FieldItem<T extends FieldValues>({field, 
                     )}
                 />
             )
-
-            console.log({file: inputComponent})
             break
         case "custom":
             inputComponent = (
