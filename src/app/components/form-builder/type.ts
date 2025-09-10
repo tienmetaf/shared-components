@@ -14,14 +14,15 @@ type CommonFieldConfig<T extends FieldValues> = {
     name: Path<T>
     label: string
     placeholder?: string
-    hidden?: (values: T, mode: FormMode) => boolean
-    disabled?: (values: T, mode: FormMode) => boolean
-    readOnly?: (values: T, mode: FormMode) => boolean
+    hidden?: (values: Partial<T>, mode: FormProps<T>["mode"]) => boolean;
+    disabled?: (values: Partial<T>, mode: FormProps<T>["mode"]) => boolean;
+    readOnly?: (values: Partial<T>, mode: FormProps<T>["mode"]) => boolean;
     colSpan?: {
         mobile?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
         tablet?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
         desktop?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
     }
+    deps?: Path<T>[];
 }
 
 type BasicFieldType = "text" | "email" | "number" | "password" | "checkbox" | "textarea"
