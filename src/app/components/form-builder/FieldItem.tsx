@@ -2,7 +2,7 @@ import {Controller, FieldValues, UseFormReturn, useWatch} from "react-hook-form"
 import {JSX, memo, useMemo} from "react";
 import {FieldConfig} from "@/app/components/form-builder/type";
 import {Label} from "@/components/ui/label";
-import {FileUploadInput} from "@/app/components/file-upload/file-upload";
+import {FileUploadInput} from "@/app/components/file-upload";
 import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
 import {Checkbox} from "@/components/ui/checkbox";
