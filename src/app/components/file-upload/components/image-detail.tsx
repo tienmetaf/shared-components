@@ -5,6 +5,7 @@ import Image from "next/image"
 import { FileText } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
+import {FileUploadConstants} from "@/app/components/file-upload/constants";
 
 interface FilePreviewProps {
     file: File | null
@@ -39,8 +40,10 @@ export function ImageDetail({ file, previewUrl, isOpen, onClose, isMobile }: Fil
             ) : (
                 <div className="flex flex-col items-center justify-center p-12 bg-muted rounded-lg text-muted-foreground">
                     <FileText className="w-20 h-20 mb-4" />
-                    <p className="text-lg font-medium">No preview available for this file type.</p>
-                    <p className="text-sm mt-2">File Name: {file?.name}</p>
+                    <p className="text-lg font-medium">{FileUploadConstants.text.noPreviewForFileType}</p>
+                    {
+                        file?.name && <p className="text-sm mt-2">{FileUploadConstants.text.fileName(file.name)}</p>
+                    }
                 </div>
             )}
         </>
@@ -57,7 +60,9 @@ export function ImageDetail({ file, previewUrl, isOpen, onClose, isMobile }: Fil
                 <DrawerContent className="max-h-[90vh] overflow-y-auto">
                     <DrawerHeader>
                         <DrawerTitle className="truncate leading-6" title={file?.name || "File Preview"}>
-                            {file?.name}
+                            {
+                                file?.name && <p className="text-sm mt-2">{FileUploadConstants.text.fileName(file.name)}</p>
+                            }
                         </DrawerTitle>
                         <DrawerDescription>
                             Size: {file ? (file.size / (1024 * 1024)).toFixed(2) : 0} MB

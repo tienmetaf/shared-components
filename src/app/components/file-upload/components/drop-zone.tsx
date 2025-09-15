@@ -1,10 +1,11 @@
 "use client"
 
 import React from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { UploadCloud, Loader2 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import {Button} from "@/components/ui/button"
+import {Card, CardContent} from "@/components/ui/card"
+import {UploadCloud, Loader2} from "lucide-react"
+import {cn} from "@/lib/utils"
+import {FileUploadConstants} from "@/app/components/file-upload/constants";
 
 interface DropZoneProps {
     onDragOver: (e: React.DragEvent<HTMLDivElement>) => void
@@ -59,12 +60,12 @@ export function DropZone({
         >
             <CardContent className="flex flex-col items-center justify-center p-6 text-center">
                 {loading ? (
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <Loader2 className="h-8 w-8 animate-spin text-primary"/>
                 ) : (
-                    <UploadCloud className="h-8 w-8 text-muted-foreground" />
+                    <UploadCloud className="h-8 w-8 text-muted-foreground"/>
                 )}
                 <p className="mt-2 text-sm text-muted-foreground">
-                    {loading ? "Processing files..." : "Drag & drop files here or"}
+                    {loading ? FileUploadConstants.text.loadingUpload : FileUploadConstants.text.dropOrBrowse}
                 </p>
                 <Button
                     type="button"
@@ -73,7 +74,7 @@ export function DropZone({
                     onClick={onBrowseClick}
                     disabled={disabled || loading || (isLimitReached && !isSingleFile)}
                 >
-                    Browse Files
+                    {FileUploadConstants.text.browseFiles}
                 </Button>
                 <input
                     type="file"
@@ -84,14 +85,13 @@ export function DropZone({
                     disabled={disabled || loading}
                 />
 
-                {/* File count display */}
                 <div className="mt-3 text-xs text-muted-foreground">
-          <span className={cn(
-              "transition-colors duration-200",
-              isLimitReached && "text-destructive font-medium"
-          )}>
-            Selected {fileCount} / {maxFiles} files
-          </span>
+                  <span className={cn(
+                      "transition-colors duration-200",
+                      isLimitReached && "text-destructive font-medium"
+                  )}>
+                    {FileUploadConstants.text.selectedFiles(fileCount, maxFiles)}
+                  </span>
                 </div>
             </CardContent>
         </Card>

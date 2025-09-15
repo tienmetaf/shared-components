@@ -8,7 +8,7 @@ import { FileText, GripVertical, Trash } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
-import { type FilePreview } from "./hooks/use-file-upload"
+import { type FilePreview } from "../hooks/use-file-upload"
 
 interface SortableItemProps {
     file: File
@@ -26,7 +26,6 @@ export function SortableItem({
                                  onFileClick,
                                  disabled
                              }: SortableItemProps) {
-    // Use file.name + file.size + file.lastModified as a unique ID for dnd-kit
     const id = `${file.name}-${file.size}-${file.lastModified}`
     const {
         attributes,
