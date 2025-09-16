@@ -38,7 +38,7 @@ type FileFieldConfig<T extends FieldValues> = CommonFieldConfig<T> & {
         maxFileSize?: number // in bytes
         acceptedFileTypes?: string[]
     }
-    imageConfig: {
+    imageConfig?: {
         aspect?: number
         minWidth?: number
         minHeight?: number

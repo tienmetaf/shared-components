@@ -1,22 +1,26 @@
 "use client"
 
-import React, {useEffect, useRef, useState, useCallback, useMemo} from "react"
+import React, {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import Image from "next/image"
-import { FileText } from "lucide-react"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
-import { FileUploadConstants } from "@/app/components/file-upload/constants"
-import { Button } from "@/components/ui/button"
-import { centerCrop, Crop, makeAspectCrop, ReactCrop } from "react-image-crop"
+import {FileText, ImageIcon} from "lucide-react"
+import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog"
+import {Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle} from "@/components/ui/drawer"
+import {FileUploadConstants} from "@/app/components/file-upload/constants"
+import {Button} from "@/components/ui/button"
+import {centerCrop, Crop, makeAspectCrop, ReactCrop} from "react-image-crop"
 
 import 'react-image-crop/dist/ReactCrop.css'
-import { FileWithCrop } from "@/app/components/file-upload/components/file-upload"
+import {FileWithCrop} from "@/app/components/file-upload/components/file-upload"
+import {Badge} from "@/components/ui/badge"
 
 interface FilePreviewProps {
     fileWithCrop: FileWithCrop | null
     isOpen: boolean
     onClose: () => void
+    onReject?: () => void
     isMobile: boolean
+    cropMode?: 'preview' | 'required'
+    remainingQueueCount?: number
     imageConfig?: {
         aspect?: number
         onCropSave?: (croppedFile: File, crop: Crop) => void
@@ -46,12 +50,23 @@ function centerAspectCrop(
     )
 }
 
-export function ImageDetail({ fileWithCrop, isOpen, onClose, isMobile, imageConfig }: FilePreviewProps) {
+export function ImageDetail({
+                                fileWithCrop,
+                                isOpen,
+                                onClose,
+                                onReject,
+                                isMobile,
+                                cropMode = 'preview',
+                                remainingQueueCount = 0,
+                                imageConfig
+                            }: FilePreviewProps) {
     const initialCrop = useMemo(() =>
-        fileWithCrop?.crop ?? { unit: '%' as const, x: 0, y: 0, width: 0, height: 0 }
-    , [fileWithCrop?.crop])
+            fileWithCrop?.crop ?? { unit: '%' as const, x: 0, y: 0, width: 0, height: 0 }
+        , [fileWithCrop?.crop])
+
+    // In required mode or when we have an aspect ratio, enable crop by default
+    const [enableCrop, setEnableCrop] = useState(cropMode === 'required')
     const [crop, setCrop] = useState<Crop>(initialCrop)
-    const [enableCrop, setEnableCrop] = useState(false)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [originalUrl, setOriginalUrl] = useState<string | null>(null)
 
@@ -79,6 +94,15 @@ export function ImageDetail({ fileWithCrop, isOpen, onClose, isMobile, imageConf
             if (previewUrl && previewUrl !== newOriginalUrl) URL.revokeObjectURL(previewUrl);
         };
     }, [file, fileWithCrop?.croppedImage]);
+
+    // Reset crop state when a new file is selected
+    useEffect(() => {
+        if (file) {
+            // In required mode or when we have an aspect ratio, enable crop by default
+            setEnableCrop(cropMode === 'required');
+            setCrop(initialCrop);
+        }
+    }, [file, initialCrop, cropMode, imageConfig?.aspect]);
 
     // Set initial crop when image loads
     const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -162,6 +186,13 @@ export function ImageDetail({ fileWithCrop, isOpen, onClose, isMobile, imageConf
         setEnableCrop(prev => !prev);
     }, []);
 
+    // Handle reject button click
+    const handleReject = useCallback(() => {
+        if (onReject) {
+            onReject();
+        }
+    }, [onReject]);
+
     // Shared content for both mobile and desktop views
     const previewContent = (
         <>
@@ -214,27 +245,52 @@ export function ImageDetail({ fileWithCrop, isOpen, onClose, isMobile, imageConf
         </>
     );
 
+    // Header content with remaining queue indicator
+    const headerContent = (
+        <>
+            {cropMode === 'required' && remainingQueueCount > 0 && (
+                <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="outline" className="px-2 py-1">
+                        <ImageIcon className="h-3 w-3 mr-1" />
+                        <span>{remainingQueueCount} more image{remainingQueueCount !== 1 ? 's' : ''} to crop</span>
+                    </Badge>
+                </div>
+            )}
+        </>
+    );
+
     // Actions for crop controls
     const cropActions = (
-        <div className="flex justify-between w-full">
-            <Button
-                variant="outline"
-                onClick={toggleCropMode}
-            >
-                {enableCrop ? "Cancel Crop" : "Crop"}
-            </Button>
+        <div className="flex justify-end gap-2 mr-2 w-full">
+            {cropMode === 'preview' && (
+                <Button
+                    variant="outline"
+                    onClick={toggleCropMode}
+                >
+                    {enableCrop ? "Cancel" : "Edit Image"}
+                </Button>
+            )}
+
+            {cropMode === 'required' && onReject && (
+                <Button
+                    variant="destructive"
+                    onClick={handleReject}
+                >
+                    Reject
+                </Button>
+            )}
+
             {enableCrop && crop && (
                 <Button
                     variant="default"
                     onClick={saveCroppedImage}
                 >
-                    Save Crop
+                    Apply
                 </Button>
             )}
         </div>
     );
 
-    // Mobile view using Drawer
     if (isMobile) {
         return (
             <Drawer
@@ -246,18 +302,24 @@ export function ImageDetail({ fileWithCrop, isOpen, onClose, isMobile, imageConf
                 <DrawerContent className="max-h-[90vh] overflow-y-auto">
                     <DrawerHeader>
                         <DrawerTitle className="truncate leading-6" title={file?.name || "File Preview"}>
-                            {file?.name && (
-                                <p className="text-sm mt-2">{FileUploadConstants.text.fileName(file.name)}</p>
-                            )}
+                            {file?.name}
                         </DrawerTitle>
                         <DrawerDescription>
                             Size: {file ? (file.size / (1024 * 1024)).toFixed(2) : "??"} MB
                             {file?.type && ` | Type: ${file.type}`}
                         </DrawerDescription>
+                        {headerContent}
                     </DrawerHeader>
                     {previewContent}
                     <DrawerFooter>
-                        {cropActions}
+                        <div className="w-full flex justify-between">
+                            {cropActions}
+                            {cropMode === 'preview' && (
+                                <Button onClick={handleClose}>
+                                    Close
+                                </Button>
+                            )}
+                        </div>
                     </DrawerFooter>
                 </DrawerContent>
             </Drawer>
@@ -284,14 +346,17 @@ export function ImageDetail({ fileWithCrop, isOpen, onClose, isMobile, imageConf
                         Size: {file ? (file.size / (1024 * 1024)).toFixed(2) : "??"} MB
                         {file?.type && ` | Type: ${file.type}`}
                     </DialogDescription>
+                    {headerContent}
                 </DialogHeader>
                 {previewContent}
                 <DialogFooter>
                     <div className="w-full flex justify-between">
                         {cropActions}
-                        <Button onClick={handleClose}>
-                            Close
-                        </Button>
+                        {cropMode === 'preview' && (
+                            <Button onClick={handleClose}>
+                                Close
+                            </Button>
+                        )}
                     </div>
                 </DialogFooter>
             </DialogContent>

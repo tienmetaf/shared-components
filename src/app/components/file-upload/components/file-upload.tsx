@@ -1,6 +1,6 @@
 "use client"
 
-import React, {useCallback, useRef, useState} from "react"
+import React, {useCallback, useEffect, useRef, useState} from "react"
 import {
     closestCenter,
     DndContext,
@@ -61,6 +61,11 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
     const [selectedFileForPreview, setSelectedFileForPreview] = useState<FileWithCrop | null>(null)
     const [isDraggingItem, setIsDraggingItem] = useState(false)
     const [showLimitTooltip, setShowLimitTooltip] = useState(false)
+
+    // New state for managing crop queue
+    const [cropQueue, setCropQueue] = useState<FileWithCrop[]>([])
+    const [cropMode, setCropMode] = useState<'preview' | 'required'>('preview')
+
     const isMobile = useIsMobile()
     const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -119,11 +124,43 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
             const {validFiles} = validateAndProcessFiles(filesToProcess)
             if (validFiles.length === 0) return
 
+            // Filter out image files for cropping queue
+            const imageFiles: File[] = []
+            const nonImageFiles: File[] = []
+
+            validFiles.forEach(file => {
+                if (file.type.startsWith('image/') && imageConfig?.aspect) {
+                    imageFiles.push(file)
+                } else {
+                    nonImageFiles.push(file)
+                }
+            })
+
+            // Create file objects for non-image files
+            const nonImageFilesWithCrop: FileWithCrop[] = nonImageFiles.map(f => ({file: f}))
+
+            // Create a crop queue for image files when aspect ratio is specified
+            if (imageFiles.length > 0 && imageConfig?.aspect) {
+                const imageCropQueue = imageFiles.map(f => ({file: f}))
+                setCropQueue(prev => [...prev, ...imageCropQueue])
+                setCropMode('required')
+            }
+
             if (isSingleFile) {
-                // Replace current file with the first valid file
-                if (validFiles.length > 0) {
-                    // Revoke existing file preview URLs
-                    value.forEach((file) => {
+                // For single file, prioritize image files for cropping if aspect is defined
+                if (imageFiles.length > 0 && imageConfig?.aspect) {
+                    // Don't immediately add to value, let the crop process handle it
+                    // Clear existing files for single file mode
+                    value.forEach(file => {
+                        const preview = filePreviews.get(file)
+                        if (preview?.url) {
+                            revokeObjectURL(preview.url)
+                        }
+                    })
+                    onChange([])
+                } else if (validFiles.length > 0) {
+                    // For non-image files or when no aspect ratio is defined
+                    value.forEach(file => {
                         const preview = filePreviews.get(file)
                         if (preview?.url) {
                             revokeObjectURL(preview.url)
@@ -132,8 +169,8 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                     onChange([{file: validFiles[0]}])
                 }
             } else {
-                const newFilesWithCrop: FileWithCrop[] = validFiles.map((f) => ({file: f}))
-                let updatedFiles: FileWithCrop[] = [...value, ...newFilesWithCrop]
+                // For multiple files
+                let updatedFiles: FileWithCrop[] = [...value, ...nonImageFilesWithCrop]
 
                 // Enforce max files limit
                 if (updatedFiles.length > (fileConfig?.maxFiles ?? Infinity)) {
@@ -153,8 +190,19 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
             isSingleFile,
             filePreviews,
             revokeObjectURL,
+            imageConfig?.aspect
         ]
     )
+
+    // Effect to process the crop queue
+    useEffect(() => {
+        if (cropQueue.length > 0) {
+            // Process the first item in the queue
+            setSelectedFileForPreview(cropQueue[0])
+        } else {
+            setSelectedFileForPreview(null)
+        }
+    }, [cropQueue])
 
     const handleDrop = useCallback(
         (e: React.DragEvent<HTMLDivElement>) => {
@@ -243,6 +291,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
             if (preview?.type === "image") {
                 if (fileWithCrop.file.type.startsWith('image/')) {
                     setSelectedFileForPreview(fileWithCrop)
+                    setCropMode('preview')
                 }
             }
         },
@@ -255,8 +304,22 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
     }, [disabled, loading, isLimitReached, isSingleFile])
 
     const handlePreviewClose = useCallback(() => {
-        setSelectedFileForPreview(null)
-    }, [])
+        if (cropMode === 'required' && cropQueue.length > 0) {
+            // Remove current file from queue without saving when in required mode
+            setCropQueue(prev => prev.slice(1))
+        } else {
+            // Normal preview close
+            setSelectedFileForPreview(null)
+        }
+    }, [cropMode, cropQueue.length])
+
+    // New handler for rejecting an image in the crop queue
+    const handleRejectImage = useCallback(() => {
+        if (cropQueue.length > 0) {
+            // Simply remove the current item from the queue without saving
+            setCropQueue(prev => prev.slice(1))
+        }
+    }, [cropQueue.length])
 
     const handleMouseEnter = useCallback(() => {
         if (isLimitReached && !isSingleFile) {
@@ -273,35 +336,65 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
     // Crop handling
     const handleCropSave = useCallback(
         (croppedFile: File, cropData: Crop) => {
-            if (!selectedFileForPreview) return;
+            const currentFile = selectedFileForPreview;
+            if (!currentFile) return;
 
-            // Find the index of the original file
-            const fileIndex = value.findIndex(fileWithCrop =>
-                fileWithCrop.file.name === selectedFileForPreview.file.name &&
-                fileWithCrop.file.size === selectedFileForPreview.file.size &&
-                fileWithCrop.file.lastModified === selectedFileForPreview.file.lastModified
-            );
+            if (cropMode === 'required' && cropQueue.length > 0) {
+                // Add the cropped file to the value and remove from queue
+                const newFileWithCrop = {
+                    file: currentFile.file,
+                    croppedImage: croppedFile,
+                    crop: cropData
+                };
 
-            if (fileIndex === -1) return;
+                if (isSingleFile) {
+                    // For single file mode, replace any existing file
+                    onChange([newFileWithCrop]);
+                } else {
+                    // For multiple files, add to existing files
+                    const updatedFiles = [...value, newFileWithCrop];
 
-            // Create a new array with the cropped file replacing the original
-            const updatedFiles = [...value];
-            updatedFiles[fileIndex] = {
-                ...updatedFiles[fileIndex],
-                croppedImage: croppedFile,
-                crop: cropData
-            };
+                    // Enforce max files limit
+                    if (updatedFiles.length > (fileConfig?.maxFiles ?? Infinity)) {
+                        onChange(updatedFiles.slice(0, fileConfig.maxFiles));
+                    } else {
+                        onChange(updatedFiles);
+                    }
+                }
 
-            onChange(updatedFiles);
-            handlePreviewClose();
+                // Remove current file from queue
+                setCropQueue(prev => prev.slice(1));
+            } else {
+                // Normal edit mode for existing files
+                const fileIndex = value.findIndex(fileWithCrop =>
+                    fileWithCrop.file.name === currentFile.file.name &&
+                    fileWithCrop.file.size === currentFile.file.size &&
+                    fileWithCrop.file.lastModified === currentFile.file.lastModified
+                );
+
+                if (fileIndex === -1) return;
+
+                const updatedFiles = [...value];
+                updatedFiles[fileIndex] = {
+                    ...updatedFiles[fileIndex],
+                    croppedImage: croppedFile,
+                    crop: cropData
+                };
+
+                onChange(updatedFiles);
+                setSelectedFileForPreview(null);
+            }
         },
-        [selectedFileForPreview, value, onChange, handlePreviewClose]
+        [selectedFileForPreview, value, onChange, cropMode, cropQueue.length, isSingleFile, fileConfig?.maxFiles]
     );
 
     // Generate sortable IDs for drag and drop
     const sortableItems = value.map(
         (fileWithCrop) => `${fileWithCrop.file.name}-${fileWithCrop.file.size}-${fileWithCrop.file.lastModified}`
     )
+
+    // Get the queue count for display
+    const remainingQueueCount = cropQueue.length - (selectedFileForPreview && cropMode === 'required' ? 1 : 0);
 
     return (
         <TooltipProvider>
@@ -378,7 +471,10 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                     fileWithCrop={selectedFileForPreview}
                     isOpen={!!selectedFileForPreview}
                     onClose={handlePreviewClose}
+                    onReject={cropMode === 'required' ? handleRejectImage : undefined}
                     isMobile={isMobile}
+                    cropMode={cropMode}
+                    remainingQueueCount={remainingQueueCount}
                     imageConfig={{
                         ...imageConfig,
                         onCropSave: handleCropSave,

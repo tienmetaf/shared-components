@@ -10,8 +10,8 @@ import {Separator} from "@/components/ui/separator"
 import {cn} from "@/lib/utils"
 import {type FilePreview} from "../hooks/use-file-upload"
 import {FileWithCrop} from "@/app/components/file-upload/components/file-upload"
-import {Dialog, DialogContent, DialogFooter, DialogHeader} from "@/components/ui/dialog"
-import {Drawer, DrawerContent, DrawerFooter, DrawerHeader} from "@/components/ui/drawer"
+import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog"
+import {Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle} from "@/components/ui/drawer"
 import {useIsMobile} from "../hooks/use-is-mobile"
 import {FileUploadConstants} from "@/app/components/file-upload/constants";
 
@@ -116,9 +116,10 @@ export function SortableItem({
 
             <div className="space-y-2 mt-4">
                 <div className="flex justify-between">
-                    <span className="font-medium">Name:</span>
+                    <span className="font-medium">File:</span>
                     <span className="text-right">{file.name}</span>
                 </div>
+                <Separator />
                 <div className="flex justify-between">
                     <span className="font-medium">Size:</span>
                     <span>{fileSizeMB} MB</span>
@@ -212,8 +213,8 @@ export function SortableItem({
                     <DialogContent className="sm:max-w-[500px]">
                         <DialogHeader>
                             <div className="text-center">
-                                <p className="text-lg font-medium">{FileUploadConstants.text.confirmDelete}</p>
-                                <p className="text-sm text-muted-foreground mt-1">{FileUploadConstants.text.cannotUndo}</p>
+                                <DialogTitle className="text-lg font-medium">{FileUploadConstants.text.confirmDelete}</DialogTitle>
+                                <DialogDescription className="text-sm text-muted-foreground mt-1">{FileUploadConstants.text.cannotUndo}</DialogDescription>
                             </div>
                         </DialogHeader>
 
@@ -244,8 +245,8 @@ export function SortableItem({
                     <DrawerContent>
                         <DrawerHeader>
                             <div className="text-center">
-                                <p className="text-lg font-medium">Are you sure you want to delete this file?</p>
-                                <p className="text-sm text-muted-foreground mt-1">This action cannot be undone.</p>
+                                <DrawerTitle className="text-lg font-medium">Are you sure you want to delete this file?</DrawerTitle>
+                                <DrawerDescription className="text-sm text-muted-foreground mt-1">This action cannot be undone.</DrawerDescription>
                             </div>
                         </DrawerHeader>
                         <div className="px-4">
@@ -257,7 +258,7 @@ export function SortableItem({
                                 variant="destructive"
                                 onClick={handleConfirmDelete}
                             >
-                                Delete File
+                                Delete
                             </Button>
                         </DrawerFooter>
                     </DrawerContent>
