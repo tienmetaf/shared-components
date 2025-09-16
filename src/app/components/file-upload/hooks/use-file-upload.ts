@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
+import {FileWithCrop} from "@/app/components/file-upload/components/file-upload";
+import {Crop} from "react-image-crop";
+import {FileUploadConstants} from "@/app/components/file-upload/constants";
 
 interface UseFileUploadOptions {
     maxFileSize?: number // in bytes
@@ -11,6 +14,9 @@ export interface FilePreview {
     file: File
     url: string
     type: "image" | "other"
+    crop?: Crop
+    croppedFile?: File
+    croppedUrl?: string
 }
 
 /**
@@ -18,12 +24,12 @@ export interface FilePreview {
  * It takes the current list of files and options, and returns previews, errors,
  * and functions to process new files and revoke object URLs.
  */
-export function useFileUpload(currentFiles: File[], options?: UseFileUploadOptions) {
+export function useFileUpload(currentFiles: FileWithCrop[], options?: UseFileUploadOptions) {
     // Use a ref to store the internal map of file -> preview for imperative updates
     // This prevents filePreviewMapRef from being a direct dependency of useEffect, avoiding infinite loops.
-    const filePreviewMapRef = useRef<Map<File, FilePreview>>(new Map())
+    const filePreviewMapRef = useRef<Map<FileWithCrop, FilePreview>>(new Map())
     // This state is what's exposed and triggers re-renders when previews change
-    const [filePreviewsState, setFilePreviewsState] = useState<Map<File, FilePreview>>(new Map())
+    const [filePreviewsState, setFilePreviewsState] = useState<Map<FileWithCrop, FilePreview>>(new Map())
 
     const [errors, setErrors] = useState<string[]>([])
 
@@ -39,14 +45,21 @@ export function useFileUpload(currentFiles: File[], options?: UseFileUploadOptio
     }, [])
 
     // Function to create and store a file preview
-    const createAndStorePreview = useCallback((file: File): FilePreview => {
+    const createAndStorePreview = useCallback((fileWithCrop: FileWithCrop): FilePreview => {
         // Check if file type starts with "image/" or if it has a common image extension
+        const file = fileWithCrop.file
+
         const isImageFile = file.type.startsWith("image/") || /\.(jpe?g|png|gif|bmp|webp|svg)$/i.test(file.name)
 
         if (isImageFile) {
             const url = URL.createObjectURL(file)
             activeObjectUrls.current.add(url)
-            return { file, url, type: "image" }
+
+            const croppedUrl = fileWithCrop.croppedImage ? URL.createObjectURL(fileWithCrop.croppedImage) : undefined
+            if (croppedUrl) {
+                activeObjectUrls.current.add(croppedUrl)
+            }
+            return { file, url, type: "image", crop: fileWithCrop.crop, croppedFile: fileWithCrop.croppedImage, croppedUrl}
         }
         // For non-image files, we don't create an object URL for preview
         return { file, url: "", type: "other" }
@@ -55,7 +68,7 @@ export function useFileUpload(currentFiles: File[], options?: UseFileUploadOptio
     // Effect to manage previews based on the `currentFiles` prop
     useEffect(() => {
         const prevFileMap = filePreviewMapRef.current // Get the previous map from ref
-        const newFileMap = new Map<File, FilePreview>()
+        const newFileMap = new Map<FileWithCrop, FilePreview>()
 
         // 1. Identify files that are no longer in currentFiles and revoke their URLs
         prevFileMap.forEach((preview, file) => {
@@ -80,9 +93,11 @@ export function useFileUpload(currentFiles: File[], options?: UseFileUploadOptio
         setFilePreviewsState(newFileMap)
 
         // Cleanup on unmount: revoke all active object URLs
+        const urls = activeObjectUrls.current
+
         return () => {
-            activeObjectUrls.current.forEach((url) => URL.revokeObjectURL(url))
-            activeObjectUrls.current.clear()
+            urls.forEach((url) => URL.revokeObjectURL(url))
+            urls.clear()
         }
     }, [currentFiles, createAndStorePreview, revokeObjectURL]) // Dependencies are currentFiles and memoized callbacks
 
@@ -115,7 +130,7 @@ export function useFileUpload(currentFiles: File[], options?: UseFileUploadOptio
 
                     if (!isAccepted) {
                         isValid = false
-                        errorMessage = `File "${file.name}" has an unsupported type. Accepted types: ${options.acceptedFileTypes.join(", ")}.`
+                        errorMessage = FileUploadConstants.message.unsupportedFileType(file.name, options.acceptedFileTypes)
                     }
                 }
 
@@ -123,11 +138,11 @@ export function useFileUpload(currentFiles: File[], options?: UseFileUploadOptio
                 // Use the current internal map for checking duplicates
                 if (
                     Array.from(filePreviewMapRef.current.keys()).some(
-                        (existingFile) => existingFile.name === file.name && existingFile.size === file.size,
+                        (existingFile) => existingFile.file.name === file.name && existingFile.file.size === file.size,
                     )
                 ) {
                     isValid = false
-                    errorMessage = `File "${file.name}" is already added.`
+                    errorMessage = FileUploadConstants.message.existsFile(file.name)
                 }
 
                 if (isValid) {

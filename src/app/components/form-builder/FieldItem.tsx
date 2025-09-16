@@ -7,6 +7,7 @@ import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
 import {Checkbox} from "@/components/ui/checkbox";
 import {cn} from "@/lib/utils";
+import {FileWithCrop} from "@/app/components/file-upload/components/file-upload";
 
 
 type FieldItemProps<T extends FieldValues> = {
@@ -16,7 +17,7 @@ type FieldItemProps<T extends FieldValues> = {
 };
 
 export const FieldItem = memo(function FieldItem<T extends FieldValues>({field, rf, mode}: FieldItemProps<T>) {
-    const { register, control, formState: {errors} } = rf;
+    const {register, control, formState: {errors}} = rf;
     const deps = useMemo(() => field.deps ?? [], [field.deps]);
 
     const depValuesArray = useWatch({control, name: deps.length ? deps : []});
@@ -64,7 +65,7 @@ export const FieldItem = memo(function FieldItem<T extends FieldValues>({field, 
                 <Controller
                     name={field.name}
                     control={control}
-                    render={({ field: controllerField }) => (
+                    render={({field: controllerField}) => (
                         <Checkbox
                             id={String(field.name)}
                             {...controllerField}
@@ -77,19 +78,20 @@ export const FieldItem = memo(function FieldItem<T extends FieldValues>({field, 
             )
             break
         case "file":
-            const {maxFiles, maxFileSize, acceptedFileTypes} = field.fileConfig || {}
-
             inputComponent = (
                 <Controller
                     name={field.name}
                     control={control}
-                    render={({ field: controllerField }) => (
+                    render={({field: controllerField}) => (
                         <FileUploadInput
-                            value={controllerField.value as File[] || []}
+                            value={(controllerField.value as FileWithCrop[]) ?? []}
                             onChange={controllerField.onChange}
-                            maxFiles={maxFiles}
-                            maxFileSize={maxFileSize}
-                            acceptedFileTypes={acceptedFileTypes}
+                            fileConfig={{
+                                ...field.fileConfig
+                            }}
+                            imageConfig={{
+                                ...field.imageConfig
+                            }}
                             disabled={isFieldNonEditable}
                         />
                     )}
@@ -101,8 +103,8 @@ export const FieldItem = memo(function FieldItem<T extends FieldValues>({field, 
                 <Controller
                     name={field.name}
                     control={control}
-                    render={({ field: f, fieldState, formState }) => {
-                        return field.render({ field: f, fieldState, formState  })
+                    render={({field: f, fieldState, formState}) => {
+                        return field.render({field: f, fieldState, formState})
                     }}
                 />
             )

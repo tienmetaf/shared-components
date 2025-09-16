@@ -3,8 +3,10 @@
 export const FileUploadConstants = {
     message: {
         onlyOneFile: "Only 1 file allowed. New file will replace current file.",
-        maxFileSize: (size: number) => `File size exceeds the limit of ${size} MB.`,
+        maxFileSize: (fileName: string, fileSize: number, maxFileSize: number) => `File "${fileName}" is ${ (fileSize / (1024 * 1024)).toFixed(2) }MB, exceeds maximum size of ${ (maxFileSize / (1024 * 1024)).toFixed(2) }MB.`,
         maxFiles: (maxFiles: number) => `Maximum ${maxFiles} files allowed. Limit reached`,
+        unsupportedFileType: (fileName: string, acceptedFileTypes: string[]) => `File "${fileName}" has an unsupported type. Accepted types: ${acceptedFileTypes.join(", ")}.`,
+        existsFile: (fileName: string) => `File "${fileName}" already exists.`,
     },
     text: {
         dropOrBrowse: "Drag & drop files here or",

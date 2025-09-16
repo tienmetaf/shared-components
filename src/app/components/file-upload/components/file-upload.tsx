@@ -1,83 +1,81 @@
 "use client"
 
-import React, { useState, useCallback, useRef, useEffect } from "react"
+import React, {useCallback, useRef, useState} from "react"
 import {
-    DndContext,
     closestCenter,
+    DndContext,
+    type DragEndEvent,
     KeyboardSensor,
     PointerSensor,
+    TouchSensor,
     useSensor,
     useSensors,
-    type DragEndEvent,
-    TouchSensor,
 } from "@dnd-kit/core"
-import {
-    SortableContext,
-    sortableKeyboardCoordinates,
-    verticalListSortingStrategy,
-} from "@dnd-kit/sortable"
-import { arrayMove } from "@dnd-kit/sortable"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { useFileUpload, type FilePreview as FilePreviewType } from "../hooks/use-file-upload"
-import { useIsMobile } from "../hooks/use-is-mobile"
-import { SortableItem } from "./sortable-item"
-import { ImageDetail } from "./image-detail"
-import { DropZone } from "./drop-zone"
-import { FileErrorList } from "./file-error-list"
-import { cn } from "@/lib/utils"
-import {FileUploadConstants} from "@/app/components/file-upload/constants";
+import {arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy} from "@dnd-kit/sortable"
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip"
+import {type FilePreview as FilePreviewType, useFileUpload} from "../hooks/use-file-upload"
+import {useIsMobile} from "../hooks/use-is-mobile"
+import {SortableItem} from "./sortable-item"
+import {ImageDetail} from "./image-detail"
+import {DropZone} from "./drop-zone"
+import {FileErrorList} from "./file-error-list"
+import {cn} from "@/lib/utils"
+import {FileUploadConstants} from "@/app/components/file-upload/constants"
+import {Crop} from "react-image-crop"
+
+export interface FileWithCrop {
+    file: File
+    croppedImage?: File
+    crop?: Crop
+}
 
 export interface FileUploadInputProps {
-    value: File[] // Controlled component: current files
-    onChange: (files: File[]) => void // Callback to update parent's files state
-    maxFiles?: number
-    maxFileSize?: number // in bytes
-    acceptedFileTypes?: string[] // e.g., ['image/jpeg', 'image/png', '.pdf']
+    value: FileWithCrop[]
+    onChange: (files: FileWithCrop[]) => void
+    fileConfig: {
+        maxFiles?: number
+        maxFileSize?: number // in bytes
+        acceptedFileTypes?: string[] // e.g., ['image/jpeg', 'image/png', '.pdf']
+    }
+    imageConfig?: {
+        aspect?: number
+        minWidth?: number
+        minHeight?: number
+        circularCrop?: boolean
+    }
     disabled?: boolean
     loading?: boolean // For external upload process (e.g., API call)
-    className?: string
+    className?: string,
 }
 
 export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                                                                     value,
                                                                     onChange,
-                                                                    maxFiles = 10,
-                                                                    maxFileSize,
-                                                                    acceptedFileTypes,
+                                                                    fileConfig,
+                                                                    imageConfig,
                                                                     disabled,
                                                                     loading,
                                                                     className,
                                                                 }) => {
     const [isDraggingOver, setIsDraggingOver] = useState(false)
-    const [selectedFileForPreview, setSelectedFileForPreview] = useState<File | null>(null)
-    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [selectedFileForPreview, setSelectedFileForPreview] = useState<FileWithCrop | null>(null)
     const [isDraggingItem, setIsDraggingItem] = useState(false)
     const [showLimitTooltip, setShowLimitTooltip] = useState(false)
     const isMobile = useIsMobile()
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    const isLimitReached = value.length >= maxFiles
-    const isSingleFile = maxFiles === 1
+    const isLimitReached = !!fileConfig?.maxFiles ? value.length >= fileConfig.maxFiles : false;
+    const isSingleFile = !!fileConfig?.maxFiles && fileConfig.maxFiles === 1
 
-    // Cleanup preview URL on unmount
-    useEffect(() => {
-        return () => {
-            if (previewUrl) {
-                URL.revokeObjectURL(previewUrl)
-            }
-        }
-    }, [previewUrl])
-
-    const { filePreviews, errors, validateAndProcessFiles, revokeObjectURL } = useFileUpload(value, {
-        maxFileSize,
-        acceptedFileTypes,
+    const {filePreviews, errors, validateAndProcessFiles, revokeObjectURL} = useFileUpload(value, {
+        maxFileSize: fileConfig?.maxFileSize ?? 5 * 1024 * 1024, // Default to 5MB
+        acceptedFileTypes: fileConfig?.acceptedFileTypes,
     })
 
+    // Configure DnD sensors with appropriate constraints
     const sensors = useSensors(
         useSensor(PointerSensor, {
-            activationConstraint: {
-                distance: 8, // Require 8px movement before starting drag
-            },
+            activationConstraint: {distance: 8}, // Require 8px movement before starting drag
         }),
         useSensor(TouchSensor, {
             activationConstraint: {
@@ -90,12 +88,12 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
         }),
     )
 
+    // Handle drag events
     const handleDragOver = useCallback(
         (e: React.DragEvent<HTMLDivElement>) => {
             e.preventDefault()
             e.stopPropagation()
 
-            // Don't allow drop if limit reached and not single file mode
             if (isLimitReached && !isSingleFile) {
                 setShowLimitTooltip(true)
                 return
@@ -113,11 +111,13 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
         setShowLimitTooltip(false)
     }, [])
 
+    // Process files after selection or drop
     const processFiles = useCallback(
         (filesToProcess: FileList) => {
             if (disabled || loading) return
 
-            const { validFiles } = validateAndProcessFiles(filesToProcess)
+            const {validFiles} = validateAndProcessFiles(filesToProcess)
+            if (validFiles.length === 0) return
 
             if (isSingleFile) {
                 // Replace current file with the first valid file
@@ -129,13 +129,15 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                             revokeObjectURL(preview.url)
                         }
                     })
-                    onChange([validFiles[0]])
+                    onChange([{file: validFiles[0]}])
                 }
             } else {
-                let updatedFiles = [...value, ...validFiles]
+                const newFilesWithCrop: FileWithCrop[] = validFiles.map((f) => ({file: f}))
+                let updatedFiles: FileWithCrop[] = [...value, ...newFilesWithCrop]
 
-                if (updatedFiles.length > maxFiles) {
-                    updatedFiles = updatedFiles.slice(0, maxFiles)
+                // Enforce max files limit
+                if (updatedFiles.length > (fileConfig?.maxFiles ?? Infinity)) {
+                    updatedFiles = updatedFiles.slice(0, fileConfig.maxFiles)
                 }
 
                 onChange(updatedFiles)
@@ -146,7 +148,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
             loading,
             validateAndProcessFiles,
             value,
-            maxFiles,
+            fileConfig?.maxFiles,
             onChange,
             isSingleFile,
             filePreviews,
@@ -180,6 +182,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
 
             processFiles(filesToProcess)
 
+            // Reset input value to allow selecting the same file again
             if (fileInputRef.current) {
                 fileInputRef.current.value = ""
             }
@@ -188,11 +191,12 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
     )
 
     const handleRemoveFile = useCallback(
-        (fileToRemove: File) => {
+        (fileToRemove: FileWithCrop) => {
             if (disabled || loading) return
 
             const updatedFiles = value.filter((file) => file !== fileToRemove)
 
+            // Clean up preview URL
             const preview = filePreviews.get(fileToRemove)
             if (preview?.url) {
                 revokeObjectURL(preview.url)
@@ -203,28 +207,23 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
         [value, onChange, disabled, loading, filePreviews, revokeObjectURL]
     )
 
+    // DnD item sorting handlers
     const handleDragStart = useCallback(() => {
         setIsDraggingItem(true)
-
-        if (selectedFileForPreview && previewUrl) {
-            URL.revokeObjectURL(previewUrl)
-            setPreviewUrl(null)
-        }
-
         setSelectedFileForPreview(null)
-    }, [selectedFileForPreview, previewUrl])
+    }, [])
 
     const handleDragEnd = useCallback(
         (event: DragEndEvent) => {
             setIsDraggingItem(false)
-            const { active, over } = event
+            const {active, over} = event
 
             if (active.id !== over?.id) {
                 const oldIndex = value.findIndex(
-                    (file) => `${file.name}-${file.size}-${file.lastModified}` === active.id
+                    (fileWithCrop) => `${fileWithCrop.file.name}-${fileWithCrop.file.size}-${fileWithCrop.file.lastModified}` === active.id
                 )
                 const newIndex = value.findIndex(
-                    (file) => `${file.name}-${file.size}-${file.lastModified}` === over?.id
+                    (fileWithCrop) => `${fileWithCrop.file.name}-${fileWithCrop.file.size}-${fileWithCrop.file.lastModified}` === over?.id
                 )
 
                 if (oldIndex !== -1 && newIndex !== -1) {
@@ -236,15 +235,14 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
         [value, onChange]
     )
 
+    // File click and preview handlers
     const handleFileClick = useCallback(
-        (file: File, preview: FilePreviewType | undefined) => {
+        (fileWithCrop: FileWithCrop, preview: FilePreviewType | undefined) => {
             if (isDraggingItem) return
 
             if (preview?.type === "image") {
-                if (file.type.startsWith('image/')) {
-                    const url = URL.createObjectURL(file)
-                    setPreviewUrl(url)
-                    setSelectedFileForPreview(file)
+                if (fileWithCrop.file.type.startsWith('image/')) {
+                    setSelectedFileForPreview(fileWithCrop)
                 }
             }
         },
@@ -256,17 +254,9 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
         fileInputRef.current?.click()
     }, [disabled, loading, isLimitReached, isSingleFile])
 
-    const sortableItems = value.map(
-        (file) => `${file.name}-${file.size}-${file.lastModified}`
-    )
-
     const handlePreviewClose = useCallback(() => {
-        if (previewUrl) {
-            URL.revokeObjectURL(previewUrl)
-            setPreviewUrl(null)
-        }
         setSelectedFileForPreview(null)
-    }, [previewUrl])
+    }, [])
 
     const handleMouseEnter = useCallback(() => {
         if (isLimitReached && !isSingleFile) {
@@ -275,11 +265,43 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
     }, [isLimitReached, isSingleFile])
 
     const getLimitMessage = () => {
-        if (isSingleFile) {
-            return FileUploadConstants.message.onlyOneFile
-        }
-        return FileUploadConstants.message.maxFiles(maxFiles)
+        return isSingleFile
+            ? FileUploadConstants.message.onlyOneFile
+            : FileUploadConstants.message.maxFiles(fileConfig?.maxFiles || 1)
     }
+
+    // Crop handling
+    const handleCropSave = useCallback(
+        (croppedFile: File, cropData: Crop) => {
+            if (!selectedFileForPreview) return;
+
+            // Find the index of the original file
+            const fileIndex = value.findIndex(fileWithCrop =>
+                fileWithCrop.file.name === selectedFileForPreview.file.name &&
+                fileWithCrop.file.size === selectedFileForPreview.file.size &&
+                fileWithCrop.file.lastModified === selectedFileForPreview.file.lastModified
+            );
+
+            if (fileIndex === -1) return;
+
+            // Create a new array with the cropped file replacing the original
+            const updatedFiles = [...value];
+            updatedFiles[fileIndex] = {
+                ...updatedFiles[fileIndex],
+                croppedImage: croppedFile,
+                crop: cropData
+            };
+
+            onChange(updatedFiles);
+            handlePreviewClose();
+        },
+        [selectedFileForPreview, value, onChange, handlePreviewClose]
+    );
+
+    // Generate sortable IDs for drag and drop
+    const sortableItems = value.map(
+        (fileWithCrop) => `${fileWithCrop.file.name}-${fileWithCrop.file.size}-${fileWithCrop.file.lastModified}`
+    )
 
     return (
         <TooltipProvider>
@@ -293,7 +315,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                                 onDrop={handleDrop}
                                 onBrowseClick={handleBrowseClick}
                                 fileCount={value.length}
-                                maxFiles={maxFiles}
+                                maxFiles={fileConfig?.maxFiles || 1}
                                 isDraggingOver={isDraggingOver}
                                 isLimitReached={isLimitReached}
                                 isSingleFile={isSingleFile}
@@ -301,7 +323,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                                 disabled={disabled}
                                 showLimitTooltip={showLimitTooltip}
                                 fileInputRef={fileInputRef}
-                                acceptedFileTypes={acceptedFileTypes}
+                                acceptedFileTypes={fileConfig?.acceptedFileTypes}
                                 onMouseEnter={handleMouseEnter}
                                 onMouseLeave={() => setShowLimitTooltip(false)}
                             />
@@ -311,7 +333,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                                 onChange={handleFileChange}
                                 className="hidden"
                                 multiple={!isSingleFile}
-                                accept={acceptedFileTypes?.join(",")}
+                                accept={fileConfig?.acceptedFileTypes?.join(",")}
                                 disabled={disabled || loading}
                             />
                         </div>
@@ -321,7 +343,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                     </TooltipContent>
                 </Tooltip>
 
-                <FileErrorList errors={errors} />
+                <FileErrorList errors={errors}/>
 
                 {value.length > 0 && (
                     <div className="mt-4 space-y-3 w-full max-w-full">
@@ -334,13 +356,13 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                             <SortableContext items={sortableItems} strategy={verticalListSortingStrategy}>
                                 <div
                                     className="space-y-3"
-                                    style={{ touchAction: 'pan-y' }}
+                                    style={{touchAction: 'pan-y'}}
                                 >
-                                    {value.map((file) => (
+                                    {value.map((fileWithCrop) => (
                                         <SortableItem
-                                            key={`${file.name}-${file.size}-${file.lastModified}`}
-                                            file={file}
-                                            preview={filePreviews.get(file)}
+                                            key={`${fileWithCrop.file.name}-${fileWithCrop.file.size}-${fileWithCrop.file.lastModified}`}
+                                            fileWithCrop={fileWithCrop}
+                                            preview={filePreviews.get(fileWithCrop)}
                                             onRemove={handleRemoveFile}
                                             onFileClick={handleFileClick}
                                             disabled={disabled || loading}
@@ -353,11 +375,14 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                 )}
 
                 <ImageDetail
-                    file={selectedFileForPreview}
-                    previewUrl={previewUrl}
+                    fileWithCrop={selectedFileForPreview}
                     isOpen={!!selectedFileForPreview}
                     onClose={handlePreviewClose}
                     isMobile={isMobile}
+                    imageConfig={{
+                        ...imageConfig,
+                        onCropSave: handleCropSave,
+                    }}
                 />
             </div>
         </TooltipProvider>

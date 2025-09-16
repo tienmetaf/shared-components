@@ -9,24 +9,30 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { type FilePreview } from "../hooks/use-file-upload"
+import { FileWithCrop } from "@/app/components/file-upload/components/file-upload"
 
 interface SortableItemProps {
-    file: File
+    fileWithCrop: FileWithCrop
     preview: FilePreview | undefined
-    onRemove: (file: File) => void
+    onRemove: (file: FileWithCrop) => void
+    onFileClick: (file: FileWithCrop, preview: FilePreview | undefined) => void
     disabled?: boolean
-    onFileClick: (file: File, preview: FilePreview | undefined) => void
-    isDragging?: boolean
 }
 
 export function SortableItem({
-                                 file,
+                                 fileWithCrop,
                                  preview,
                                  onRemove,
                                  onFileClick,
                                  disabled
                              }: SortableItemProps) {
+    // Use the cropped image if available, otherwise use the original file
+    const file = fileWithCrop.croppedImage ?? fileWithCrop.file
+
+    // Create a unique ID for the sortable item
     const id = `${file.name}-${file.size}-${file.lastModified}`
+
+    // Configure sortable behavior
     const {
         attributes,
         listeners,
@@ -50,11 +56,20 @@ export function SortableItem({
                 return
             }
             if (preview?.type === "image") {
-                onFileClick(file, preview)
+                onFileClick(fileWithCrop, preview)
             }
         },
-        [isDragging, preview, file, onFileClick]
+        [isDragging, preview, fileWithCrop, onFileClick]
     )
+
+    // Handle file removal
+    const handleRemove = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation()
+        onRemove(fileWithCrop)
+    }, [onRemove, fileWithCrop])
+
+    // Format file size
+    const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2)
 
     return (
         <div
@@ -66,6 +81,7 @@ export function SortableItem({
                 isDragging && "opacity-50 z-50"
             )}
         >
+            {/* Drag handle */}
             <Button
                 type="button"
                 variant="ghost"
@@ -85,6 +101,7 @@ export function SortableItem({
                 <GripVertical className="w-5 h-5 text-muted-foreground" />
             </Button>
 
+            {/* File preview and info */}
             <div
                 className={cn(
                     "flex items-center gap-2 flex-grow min-w-0 py-2",
@@ -92,10 +109,11 @@ export function SortableItem({
                 )}
                 onClick={handleFileClick}
             >
+                {/* Preview thumbnail */}
                 {preview?.type === "image" && preview.url ? (
                     <div className="flex-shrink-0 w-12 h-12">
                         <Image
-                            src={preview.url || "/placeholder.svg"}
+                            src={preview.croppedUrl || preview.url}
                             alt={file.name}
                             width={48}
                             height={48}
@@ -108,26 +126,25 @@ export function SortableItem({
                     </div>
                 )}
 
+                {/* File name and size */}
                 <div className="flex-1 min-w-0 pr-1">
                     <div className="truncate text-sm font-medium" title={file.name}>
                         {file.name}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                        {(file.size / (1024 * 1024)).toFixed(2)} MB
+                        {fileSizeMB} MB
                     </div>
                 </div>
             </div>
 
             <Separator orientation="vertical" className="min-h-8" />
 
+            {/* Remove button */}
             <Button
                 type="button"
                 variant="ghost"
                 size="default"
-                onClick={(e) => {
-                    e.stopPropagation()
-                    onRemove(file)
-                }}
+                onClick={handleRemove}
                 className="flex-shrink-0 px-2 mx-1 hover:bg-red-500 hover:text-white"
                 disabled={disabled}
                 aria-label={`Remove ${file.name}`}
