@@ -33,7 +33,7 @@ export function SortableItem({
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const isMobile = useIsMobile()
 
-    const file = fileWithCrop.croppedImage ?? fileWithCrop.file
+    const file = fileWithCrop.file
 
     const id = `${file.name}-${file.size}-${file.lastModified}`
 
