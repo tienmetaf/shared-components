@@ -16,5 +16,7 @@ export const FileUploadConstants = {
         selectedFiles: (fileCount: number, maxFiles: number) => `Selected ${fileCount} / ${maxFiles} files`,
         noPreviewForFileType: "No preview available for this file type.",
         fileName: (fileName: string) => `File Name: ${fileName}`,
+        confirmDelete: "Are you sure you want to delete this file?",
+        cannotUndo: "This action cannot be undone.",
     }
 }
