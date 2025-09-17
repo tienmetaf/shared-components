@@ -84,9 +84,15 @@ const userFields: FieldConfig<UserFormValues>[] = [
         placeholder: "Add file here...",
         colSpan: {mobile: 12, tablet: 12, desktop: 12},
         fileConfig: {
-            maxFiles: 2,
+            maxFiles: 3,
             maxFileSize: 1024 * 1024 * 1000,
             acceptedFileTypes: ["image/jpeg", "image/png", "application/pdf", ".zip"],
+        },
+        imageConfig: {
+            aspect: 1,
+            minWidth: 100,
+            minHeight: 100,
+            circularCrop: false,
         },
     },
     {

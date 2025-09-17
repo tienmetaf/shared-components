@@ -7,7 +7,7 @@ import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, Di
 import {Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle} from "@/components/ui/drawer"
 import {FileUploadConstants} from "@/app/components/file-upload/constants"
 import {Button} from "@/components/ui/button"
-import {centerCrop, Crop, makeAspectCrop, ReactCrop} from "react-image-crop"
+import {centerCrop, convertToPixelCrop, Crop, makeAspectCrop, PixelCrop, ReactCrop} from "react-image-crop"
 
 import 'react-image-crop/dist/ReactCrop.css'
 import {FileWithCrop} from "@/app/components/file-upload/components/file-upload"
@@ -61,14 +61,15 @@ export function ImageDetail({
                                 imageConfig
                             }: FilePreviewProps) {
     const initialCrop = useMemo(() =>
-            fileWithCrop?.crop ?? { unit: '%' as const, x: 0, y: 0, width: 0, height: 0 }
-        , [fileWithCrop?.crop])
+            fileWithCrop?.crop ?? undefined
+        , [fileWithCrop])
 
     // In required mode or when we have an aspect ratio, enable crop by default
     const [enableCrop, setEnableCrop] = useState(cropMode === 'required')
-    const [crop, setCrop] = useState<Crop>(initialCrop)
+    const [crop, setCrop] = useState<Crop>()
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [originalUrl, setOriginalUrl] = useState<string | null>(null)
+    const [completedCrop, setCompletedCrop] = useState<PixelCrop>()
 
     const imgRef = useRef<HTMLImageElement>(null)
     const file = fileWithCrop?.file
@@ -106,14 +107,20 @@ export function ImageDetail({
 
     // Set initial crop when image loads
     const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
-        if (!enableCrop || !imageConfig?.aspect) return;
+        if (!enableCrop) return;
 
         const { width, height } = e.currentTarget;
 
         if (fileWithCrop?.crop) {
             setCrop(fileWithCrop.crop);
+        } else if (imageConfig?.aspect) {
+            const newCrop = centerAspectCrop(width, height, imageConfig.aspect);
+            setCrop(newCrop);
+            setCompletedCrop(convertToPixelCrop(newCrop, width, height))
         } else {
-            setCrop(centerAspectCrop(width, height, imageConfig.aspect));
+            const newCrop = centerAspectCrop(width, height, 3 / 4);
+            setCrop(newCrop);
+            setCompletedCrop(convertToPixelCrop(newCrop, width, height))
         }
     }, [enableCrop, imageConfig?.aspect, fileWithCrop?.crop]);
 
@@ -127,6 +134,7 @@ export function ImageDetail({
     // Save the cropped image
     const saveCroppedImage = useCallback(() => {
         if (!crop || !imgRef.current || !file) return;
+        const cropToUse = completedCrop || crop;
 
         const image = imgRef.current;
         const canvas = document.createElement('canvas');
@@ -138,10 +146,10 @@ export function ImageDetail({
         const scaleY = image.naturalHeight / image.height;
 
         const pixelCrop = {
-            x: crop.x * scaleX,
-            y: crop.y * scaleY,
-            width: crop.width * scaleX,
-            height: crop.height * scaleY,
+            x: cropToUse.x * scaleX,
+            y: cropToUse.y * scaleY,
+            width: cropToUse.width * scaleX,
+            height: cropToUse.height * scaleY,
         };
 
         // Set canvas dimensions
@@ -179,7 +187,7 @@ export function ImageDetail({
             // Clean up
             setEnableCrop(false);
         }, file.type);
-    }, [crop, file, imageConfig?.onCropSave]);
+    }, [crop, completedCrop, imageConfig?.onCropSave]);
 
     // Toggle crop mode
     const toggleCropMode = useCallback(() => {
@@ -203,6 +211,7 @@ export function ImageDetail({
                     {enableCrop ? (
                         <ReactCrop
                             crop={crop}
+                            onComplete={c => setCompletedCrop(c)}
                             onChange={setCrop}
                             aspect={imageConfig?.aspect}
                             minWidth={imageConfig?.minWidth}
