@@ -112,7 +112,7 @@ export function ImageDetail({
                             }: FilePreviewProps) {
     // Use crop data from edited portion if available
     const initialCrop = useMemo(() =>
-            fileWithCrop?.editted?.crop ?? undefined
+            fileWithCrop?.edited?.crop ?? undefined
         , [fileWithCrop])
 
     // In required mode or when we have an aspect ratio, enable crop by default
@@ -140,10 +140,10 @@ export function ImageDetail({
         setOriginalUrl(newOriginalUrl);
 
         // Set up preview URL (prefer edited over original)
-        if (fileWithCrop.editted?.url) {
-            setPreviewUrl(fileWithCrop.editted.url);
-        } else if (fileWithCrop.editted?.file) {
-            const newPreviewUrl = URL.createObjectURL(fileWithCrop.editted.file);
+        if (fileWithCrop.edited?.url) {
+            setPreviewUrl(fileWithCrop.edited.url);
+        } else if (fileWithCrop.edited?.file) {
+            const newPreviewUrl = URL.createObjectURL(fileWithCrop.edited.file);
             setPreviewUrl(newPreviewUrl);
         } else {
             setPreviewUrl(newOriginalUrl);
@@ -155,7 +155,7 @@ export function ImageDetail({
             if (fileWithCrop.origin.file && newOriginalUrl) {
                 URL.revokeObjectURL(newOriginalUrl);
             }
-            if (fileWithCrop.editted?.file && previewUrl && previewUrl !== newOriginalUrl && previewUrl !== fileWithCrop.editted?.url) {
+            if (fileWithCrop.edited?.file && previewUrl && previewUrl !== newOriginalUrl && previewUrl !== fileWithCrop.edited?.url) {
                 URL.revokeObjectURL(previewUrl);
             }
         };
@@ -177,8 +177,8 @@ export function ImageDetail({
 
         const { width, height } = e.currentTarget;
 
-        if (fileWithCrop?.editted?.crop) {
-            setCrop(fileWithCrop.editted.crop);
+        if (fileWithCrop?.edited?.crop) {
+            setCrop(fileWithCrop.edited.crop);
         } else if (imageConfig?.aspect) {
             const newCrop = centerAspectCrop(width, height, imageConfig.aspect);
             setCrop(newCrop);
@@ -188,7 +188,7 @@ export function ImageDetail({
             setCrop(newCrop);
             setCompletedCrop(convertToPixelCrop(newCrop, width, height))
         }
-    }, [enableCrop, imageConfig?.aspect, fileWithCrop?.editted?.crop]);
+    }, [enableCrop, imageConfig?.aspect, fileWithCrop?.edited?.crop]);
 
     // Handle image load error
     const onImageError = useCallback(() => {

@@ -31,7 +31,7 @@ export interface FileWithCrop {
         file?: File,
         url?: string
     },
-    editted?: {
+    edited?: {
         file?: File,
         url?: string,
         crop?: Crop
@@ -454,7 +454,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                 // Add the cropped file to the value and remove from queue
                 const newFileWithCrop: FileWithCrop = {
                     origin: { ...currentFile.origin },
-                    editted: {
+                    edited: {
                         file: croppedFile || undefined,
                         url: croppedUrl,
                         crop: cropData
@@ -496,7 +496,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                 const updatedFiles = [...value];
                 updatedFiles[fileIndex] = {
                     origin: { ...updatedFiles[fileIndex].origin },
-                    editted: {
+                    edited: {
                         file: croppedFile || undefined,
                         url: croppedUrl,
                         crop: cropData

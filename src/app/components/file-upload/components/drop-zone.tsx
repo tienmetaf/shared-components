@@ -3,7 +3,7 @@
 import React, {useState} from "react"
 import {Button} from "@/components/ui/button"
 import {Card, CardContent} from "@/components/ui/card"
-import {UploadCloud, Loader2, Link, Plus} from "lucide-react"
+import {Loader2, Plus, UploadCloud} from "lucide-react"
 import {cn} from "@/lib/utils"
 import {FileUploadConstants} from "@/app/components/file-upload/constants"
 import {Input} from "@/components/ui/input"

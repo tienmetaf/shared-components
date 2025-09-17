@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
-import { FileWithCrop } from "@/app/components/file-upload/components/file-upload"
-import { Crop } from "react-image-crop"
-import { FileUploadConstants } from "@/app/components/file-upload/constants"
+import {useCallback, useEffect, useRef, useState} from "react"
+import {FileWithCrop} from "@/app/components/file-upload/components/file-upload"
+import {FileUploadConstants} from "@/app/components/file-upload/constants"
 
 interface UseFileUploadOptions {
     maxFileSize?: number // in bytes
@@ -121,8 +120,8 @@ export function useFileUpload(currentFiles: FileWithCrop[], options?: UseFileUpl
         // First, determine what kind of content we're dealing with (file or url)
         const originFile = fileWithCrop.origin.file;
         const originUrl = fileWithCrop.origin.url;
-        const editedFile = fileWithCrop.editted?.file;
-        const editedUrl = fileWithCrop.editted?.url;
+        const editedFile = fileWithCrop.edited?.file;
+        const editedUrl = fileWithCrop.edited?.url;
 
         // Determine if this is an image based on either file type or URL extension
         let isImageContent = false;
@@ -180,7 +179,7 @@ export function useFileUpload(currentFiles: FileWithCrop[], options?: UseFileUpl
                 if (preview.url && !file.origin.url) {
                     revokeObjectURL(preview.url);
                 }
-                if (preview.croppedUrl && !file.editted?.url) {
+                if (preview.croppedUrl && !file.edited?.url) {
                     revokeObjectURL(preview.croppedUrl);
                 }
             }
