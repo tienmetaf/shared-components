@@ -60,8 +60,9 @@ export function ImageDetail({
                                 remainingQueueCount = 0,
                                 imageConfig
                             }: FilePreviewProps) {
+    // Use crop data from edited portion if available
     const initialCrop = useMemo(() =>
-            fileWithCrop?.crop ?? undefined
+            fileWithCrop?.editted?.crop ?? undefined
         , [fileWithCrop])
 
     // In required mode or when we have an aspect ratio, enable crop by default
@@ -72,38 +73,50 @@ export function ImageDetail({
     const [completedCrop, setCompletedCrop] = useState<PixelCrop>()
 
     const imgRef = useRef<HTMLImageElement>(null)
-    const file = fileWithCrop?.file
+    const file = fileWithCrop?.origin.file
+    const fileUrl = fileWithCrop?.origin.url
 
     // Create and manage URLs for the original and cropped images
     useEffect(() => {
-        if (!file) return;
+        if (!fileWithCrop) return;
 
-        // Create URLs for original and preview images
-        const newOriginalUrl = URL.createObjectURL(file);
+        // Set up original URL (prefer file over URL)
+        let newOriginalUrl = fileWithCrop.origin.url || null;
+        if (fileWithCrop.origin.file) {
+            newOriginalUrl = URL.createObjectURL(fileWithCrop.origin.file);
+        }
         setOriginalUrl(newOriginalUrl);
 
-        if (fileWithCrop?.croppedImage) {
-            const newPreviewUrl = URL.createObjectURL(fileWithCrop.croppedImage);
+        // Set up preview URL (prefer edited over original)
+        if (fileWithCrop.editted?.url) {
+            setPreviewUrl(fileWithCrop.editted.url);
+        } else if (fileWithCrop.editted?.file) {
+            const newPreviewUrl = URL.createObjectURL(fileWithCrop.editted.file);
             setPreviewUrl(newPreviewUrl);
         } else {
             setPreviewUrl(newOriginalUrl);
         }
 
-        // Cleanup function to revoke object URLs
+        // Cleanup function
         return () => {
-            if (newOriginalUrl) URL.revokeObjectURL(newOriginalUrl);
-            if (previewUrl && previewUrl !== newOriginalUrl) URL.revokeObjectURL(previewUrl);
+            // Only revoke URLs we created with createObjectURL
+            if (fileWithCrop.origin.file && newOriginalUrl) {
+                URL.revokeObjectURL(newOriginalUrl);
+            }
+            if (fileWithCrop.editted?.file && previewUrl && previewUrl !== newOriginalUrl && previewUrl !== fileWithCrop.editted?.url) {
+                URL.revokeObjectURL(previewUrl);
+            }
         };
-    }, [file, fileWithCrop?.croppedImage]);
+    }, [fileWithCrop]);
 
     // Reset crop state when a new file is selected
     useEffect(() => {
-        if (file) {
+        if (fileWithCrop) {
             // In required mode or when we have an aspect ratio, enable crop by default
             setEnableCrop(cropMode === 'required');
             setCrop(initialCrop);
         }
-    }, [file, initialCrop, cropMode, imageConfig?.aspect]);
+    }, [fileWithCrop, initialCrop, cropMode, imageConfig?.aspect]);
 
     // Set initial crop when image loads
     const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -111,8 +124,8 @@ export function ImageDetail({
 
         const { width, height } = e.currentTarget;
 
-        if (fileWithCrop?.crop) {
-            setCrop(fileWithCrop.crop);
+        if (fileWithCrop?.editted?.crop) {
+            setCrop(fileWithCrop.editted.crop);
         } else if (imageConfig?.aspect) {
             const newCrop = centerAspectCrop(width, height, imageConfig.aspect);
             setCrop(newCrop);
@@ -122,7 +135,7 @@ export function ImageDetail({
             setCrop(newCrop);
             setCompletedCrop(convertToPixelCrop(newCrop, width, height))
         }
-    }, [enableCrop, imageConfig?.aspect, fileWithCrop?.crop]);
+    }, [enableCrop, imageConfig?.aspect, fileWithCrop?.editted?.crop]);
 
     // Reset crop state when closing dialog
     const handleClose = useCallback(() => {
@@ -133,7 +146,7 @@ export function ImageDetail({
 
     // Save the cropped image
     const saveCroppedImage = useCallback(() => {
-        if (!crop || !imgRef.current || !file) return;
+        if (!crop || !imgRef.current || (!file && !fileUrl)) return;
         const cropToUse = completedCrop || crop;
 
         const image = imgRef.current;
@@ -169,13 +182,16 @@ export function ImageDetail({
             pixelCrop.height
         );
 
+        // Determine file type
+        const fileType = file?.type || 'image/jpeg';
+
         // Convert canvas to Blob
         canvas.toBlob((blob) => {
-            if (!blob || !file) return;
+            if (!blob) return;
 
             // Create a new File object with the cropped image
-            const croppedFile = new File([blob], file.name, {
-                type: file.type,
+            const croppedFile = new File([blob], file?.name || 'cropped-image.jpg', {
+                type: fileType,
                 lastModified: Date.now()
             });
 
@@ -186,8 +202,8 @@ export function ImageDetail({
 
             // Clean up
             setEnableCrop(false);
-        }, file.type);
-    }, [crop, completedCrop, imageConfig?.onCropSave]);
+        }, fileType);
+    }, [crop, completedCrop, file, fileUrl, imageConfig?.onCropSave]);
 
     // Toggle crop mode
     const toggleCropMode = useCallback(() => {
@@ -204,7 +220,7 @@ export function ImageDetail({
     // Shared content for both mobile and desktop views
     const previewContent = (
         <>
-            {file?.type.startsWith('image/') && previewUrl ? (
+            {((file && file.type.startsWith('image/')) || fileUrl) && previewUrl ? (
                 <div
                     data-vaul-no-drag={enableCrop ? '' : undefined}
                     className="relative w-full h-auto max-h-[70vh] flex items-center justify-center bg-muted rounded-lg">
@@ -221,24 +237,24 @@ export function ImageDetail({
                             <Image
                                 ref={imgRef}
                                 src={originalUrl!}
-                                alt={file.name}
+                                alt={file?.name || "Image"}
                                 width={700}
                                 height={500}
                                 style={{maxWidth: "100%", maxHeight: "70vh"}}
                                 className="rounded-lg w-fit object-contain"
                                 onLoad={onImageLoad}
-                                onError={() => console.error('Image load error for:', file.name)}
+                                onError={() => console.error('Image load error for:', file?.name || fileUrl)}
                             />
                         </ReactCrop>
                     ) : (
                         <Image
                             src={previewUrl}
-                            alt={file.name}
+                            alt={file?.name || "Image"}
                             width={700}
                             height={500}
                             style={{maxWidth: "100%", maxHeight: "70vh"}}
                             className="rounded-lg w-fit object-contain"
-                            onError={() => console.error('Image load error for:', file.name)}
+                            onError={() => console.error('Image load error for:', file?.name || fileUrl)}
                         />
                     )}
                 </div>
@@ -310,8 +326,8 @@ export function ImageDetail({
             >
                 <DrawerContent className="max-h-[90vh] overflow-y-auto">
                     <DrawerHeader>
-                        <DrawerTitle className="truncate leading-6" title={file?.name || "File Preview"}>
-                            {file?.name}
+                        <DrawerTitle className="truncate leading-6" title={file?.name || fileUrl || "File Preview"}>
+                            {file?.name || fileUrl || "File Preview"}
                         </DrawerTitle>
                         <DrawerDescription>
                             Size: {file ? (file.size / (1024 * 1024)).toFixed(2) : "??"} MB
@@ -347,9 +363,9 @@ export function ImageDetail({
                 <DialogHeader className="w-full overflow-hidden">
                     <DialogTitle
                         className="truncate leading-6"
-                        title={file?.name || "File Preview"}
+                        title={file?.name || fileUrl || "File Preview"}
                     >
-                        {file?.name}
+                        {file?.name || fileUrl || "File Preview"}
                     </DialogTitle>
                     <DialogDescription>
                         Size: {file ? (file.size / (1024 * 1024)).toFixed(2) : "??"} MB

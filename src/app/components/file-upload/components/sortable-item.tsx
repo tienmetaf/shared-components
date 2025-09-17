@@ -1,6 +1,6 @@
 "use client"
 
-import React, {useCallback, useState} from "react"
+import React, {memo, useCallback, useState} from "react"
 import {useSortable} from "@dnd-kit/sortable"
 import {CSS} from "@dnd-kit/utilities"
 import Image from "next/image"
@@ -23,19 +23,28 @@ interface SortableItemProps {
     disabled?: boolean
 }
 
-export function SortableItem({
-                                 fileWithCrop,
-                                 preview,
-                                 onRemove,
-                                 onFileClick,
-                                 disabled
-                             }: SortableItemProps) {
+export const SortableItem = memo(function SortableItem({
+                                                           fileWithCrop,
+                                                           preview,
+                                                           onRemove,
+                                                           onFileClick,
+                                                           disabled
+                                                       }: SortableItemProps) {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const isMobile = useIsMobile()
 
-    const file = fileWithCrop.file
+    const file = fileWithCrop.origin.file
+    const fileUrl = fileWithCrop.origin.url
 
-    const id = `${file.name}-${file.size}-${file.lastModified}`
+    // Generate a unique ID for the sortable item
+    let id: string;
+    if (file) {
+        id = `${file.name}-${file.size}-${file.lastModified}`;
+    } else if (fileUrl) {
+        id = fileUrl;
+    } else {
+        id = `item-${Math.random().toString(36).substr(2, 9)}`;
+    }
 
     const {
         attributes,
@@ -84,7 +93,10 @@ export function SortableItem({
     }, [])
 
     // Format file size
-    const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2)
+    const fileSizeMB = file ? (file.size / (1024 * 1024)).toFixed(2) : "??";
+
+    // Get file name (from file or URL)
+    const fileName = file?.name || fileUrl?.split('/').pop() || "File";
 
     // File preview image/icon for the confirmation
     const filePreviewContent = (
@@ -93,7 +105,8 @@ export function SortableItem({
                 <div className="w-full flex justify-center my-4">
                     <Image
                         src={preview.croppedUrl || preview.url}
-                        alt={file.name}
+                        key={`img-${preview.croppedUrl || preview.url}`}
+                        alt={fileName}
                         width={300}
                         height={200}
                         className="rounded-md max-h-[300px] w-auto object-contain"
@@ -117,7 +130,7 @@ export function SortableItem({
             <div className="space-y-2 mt-4">
                 <div className="flex justify-between">
                     <span className="font-medium">File:</span>
-                    <span className="text-right">{file.name}</span>
+                    <span className="text-right">{fileName}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
@@ -170,7 +183,7 @@ export function SortableItem({
                         <div className="flex-shrink-0 w-12 h-12">
                             <Image
                                 src={preview.croppedUrl || preview.url}
-                                alt={file.name}
+                                alt={fileName}
                                 width={48}
                                 height={48}
                                 className="w-full h-full object-cover rounded-md"
@@ -183,8 +196,8 @@ export function SortableItem({
                     )}
 
                     <div className="flex-1 min-w-0 pr-1">
-                        <div className="truncate text-sm font-medium" title={file.name}>
-                            {file.name}
+                        <div className="truncate text-sm font-medium" title={fileName}>
+                            {fileName}
                         </div>
                         <div className="text-xs text-muted-foreground">
                             {fileSizeMB} MB
@@ -201,7 +214,7 @@ export function SortableItem({
                     onClick={handleDeleteClick}
                     className="flex-shrink-0 px-2 mx-1 hover:bg-red-500 hover:text-white"
                     disabled={disabled}
-                    aria-label={`Remove ${file.name}`}
+                    aria-label={`Remove ${fileName}`}
                 >
                     <Trash className="w-5 h-5" />
                 </Button>
@@ -266,4 +279,4 @@ export function SortableItem({
             )}
         </>
     )
-}
+})

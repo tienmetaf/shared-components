@@ -11,11 +11,8 @@ interface UseFileUploadOptions {
 }
 
 export interface FilePreview {
-    file: File
     url: string
     type: "image" | "other"
-    crop?: Crop
-    croppedFile?: File
     croppedUrl?: string
 }
 
@@ -44,36 +41,79 @@ export function useFileUpload(currentFiles: FileWithCrop[], options?: UseFileUpl
         }
     }, [])
 
+    // Helper to check if a file is an image by type or extension
+    const isImageType = useCallback((fileName: string, fileType?: string): boolean => {
+        if (fileType && fileType.startsWith("image/")) return true;
+        return /\.(jpe?g|png|gif|bmp|webp|svg)$/i.test(fileName);
+    }, []);
+
     // Function to create and store a file preview
     const createAndStorePreview = useCallback((fileWithCrop: FileWithCrop): FilePreview => {
-        // Check if file type starts with "image/" or if it has a common image extension
-        const file = fileWithCrop.file
+        // First, determine what kind of content we're dealing with (file or url)
+        const originFile = fileWithCrop.origin.file;
+        const originUrl = fileWithCrop.origin.url;
+        const editedFile = fileWithCrop.editted?.file;
+        const editedUrl = fileWithCrop.editted?.url;
 
-        const isImageFile = file.type.startsWith("image/") || /\.(jpe?g|png|gif|bmp|webp|svg)$/i.test(file.name)
+        // Determine if this is an image based on either file type or URL extension
+        let isImageContent = false;
 
-        if (isImageFile) {
-            const url = URL.createObjectURL(file)
-            activeObjectUrls.current.add(url)
-
-            const croppedUrl = fileWithCrop.croppedImage ? URL.createObjectURL(fileWithCrop.croppedImage) : undefined
-            if (croppedUrl) {
-                activeObjectUrls.current.add(croppedUrl)
-            }
-            return { file, url, type: "image", crop: fileWithCrop.crop, croppedFile: fileWithCrop.croppedImage, croppedUrl}
+        if (originFile) {
+            isImageContent = isImageType(originFile.name, originFile.type);
+        } else if (originUrl) {
+            isImageContent = isImageType(originUrl);
         }
-        // For non-image files, we don't create an object URL for preview
-        return { file, url: "", type: "other" }
-    }, [])
+
+        // Create preview based on content type
+        if (isImageContent) {
+            // For edited content, prioritize that
+            let previewUrl = "";
+            let croppedUrl: string | undefined = undefined;
+
+            // Set up original URL
+            if (originFile) {
+                previewUrl = URL.createObjectURL(originFile);
+                activeObjectUrls.current.add(previewUrl);
+            } else if (originUrl) {
+                previewUrl = originUrl; // No need to create object URL for remote URLs
+            }
+
+            // Set up cropped/edited URL
+            if (editedFile) {
+                croppedUrl = URL.createObjectURL(editedFile);
+                activeObjectUrls.current.add(croppedUrl);
+            } else if (editedUrl) {
+                croppedUrl = editedUrl;
+            }
+
+            return { url: previewUrl, type: "image", croppedUrl };
+        }
+
+        // For non-image files/URLs
+        if (originFile) {
+            return { url: "", type: "other" }; // No preview for non-image files
+        } else if (originUrl) {
+            return { url: originUrl, type: "other" }; // Just use the URL directly
+        }
+
+        // Fallback
+        return { url: "", type: "other" };
+    }, [isImageType])
 
     // Effect to manage previews based on the `currentFiles` prop
     useEffect(() => {
         const prevFileMap = filePreviewMapRef.current // Get the previous map from ref
         const newFileMap = new Map<FileWithCrop, FilePreview>()
 
-        // 1. Identify files that are no longer in currentFiles and revoke their URLs
+        // 1. Identify items that are no longer in currentFiles and revoke their URLs
         prevFileMap.forEach((preview, file) => {
             if (!currentFiles.includes(file)) {
-                revokeObjectURL(preview.url)
+                if (preview.url && !file.origin.url) {
+                    revokeObjectURL(preview.url);
+                }
+                if (preview.croppedUrl && !file.editted?.url) {
+                    revokeObjectURL(preview.croppedUrl);
+                }
             }
         })
 
@@ -138,7 +178,15 @@ export function useFileUpload(currentFiles: FileWithCrop[], options?: UseFileUpl
                 // Use the current internal map for checking duplicates
                 if (
                     Array.from(filePreviewMapRef.current.keys()).some(
-                        (existingFile) => existingFile.file.name === file.name && existingFile.file.size === file.size,
+                        (existingFile) => {
+                            // Check if the existing file has a File object
+                            const existingOriginFile = existingFile.origin.file;
+
+                            // Only compare if both have File objects
+                            return existingOriginFile &&
+                                existingOriginFile.name === file.name &&
+                                existingOriginFile.size === file.size;
+                        }
                     )
                 ) {
                     isValid = false

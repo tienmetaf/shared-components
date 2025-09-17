@@ -14,7 +14,12 @@ const userSchema = z.object({
     age: z.string().optional(),
     newsletter: z.boolean().optional(),
     notes: z.string().optional(),
-    files: z.array(z.instanceof(File)).min(1, "At least one file is required"),
+    files: z.array(z.object({
+        origin: z.object({
+            url: z.string().url(),
+        }),
+        // Add other properties for FileWithCrop as needed
+    })).min(1, "At least one file is required"),
     birthday: z.string().optional(),
 })
 
@@ -131,15 +136,16 @@ export default function HomePage() {
     // }
 
     // Example existing user data for update/delete modes
-    // const existingUser = {
-    //     id: "user-123",
-    //     firstName: "John",
-    //     lastName: "Doe",
-    //     email: "john.doe@example.com",
-    //     age: 30,
-    //     newsletter: true,
-    //     notes: "This is an existing user.",
-    // }
+    const existingUser = {
+        id: "user-123",
+        firstName: "John",
+        lastName: "Doe",
+        email: "john.doe@example.com",
+        age: 30,
+        newsletter: true,
+        notes: "This is an existing user.",
+        files: [],
+    }
 
     return (
         <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 bg-gray-50 space-y-8">
@@ -152,7 +158,13 @@ export default function HomePage() {
                 title="Create New User"
                 description="Fill in the details to create a new user account."
                 mode="create"
-                defaultValues={{newsletter: false, files: []}} // Default for create mode
+                defaultValues={{newsletter: false, files: [
+                        {
+                            origin: {
+                                url: "https://cdn.pixabay.com/photo/2024/11/08/12/57/cat-9183327_1280.jpg",
+                            }
+                        }
+                    ]}} // Default for create mode
             />
 
             {/*/!* Update Form Example *!/*/}
