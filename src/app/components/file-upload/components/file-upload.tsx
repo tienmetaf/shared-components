@@ -22,6 +22,9 @@ import {FileErrorList} from "./file-error-list"
 import {cn} from "@/lib/utils"
 import {FileUploadConstants} from "@/app/components/file-upload/constants"
 import {Crop} from "react-image-crop"
+import { toast } from "sonner"
+
+// import { toast } from "@/components/ui/use-toast"
 
 export interface FileWithCrop {
     origin: {
@@ -79,7 +82,13 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
     const isSingleFile = !!fileConfig?.maxFiles && fileConfig.maxFiles === 1
 
     // Modified to work with new FileWithCrop structure
-    const {filePreviews, errors, validateAndProcessFiles, revokeObjectURL} = useFileUpload(value, {
+    const {
+        filePreviews,
+        errors,
+        validateAndProcessFiles,
+        validateAndProcessUrl,
+        revokeObjectURL
+    } = useFileUpload(value, {
         maxFileSize: fileConfig?.maxFileSize ?? 5 * 1024 * 1024, // Default to 5MB
         acceptedFileTypes: fileConfig?.acceptedFileTypes,
     })
@@ -205,6 +214,81 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
         ]
     )
 
+    // New function to process URL input
+    const processImageUrl = useCallback(
+        async (url: string) => {
+            if (disabled || loading) return
+
+            try {
+                const isValid = await validateAndProcessUrl(url)
+
+                if (!isValid) {
+                    toast.error("Invalid image URL. Please enter a valid image URL.")
+                    return
+                }
+
+                // Create a new file object with the URL
+                const newFileWithCrop: FileWithCrop = {
+                    origin: { url }
+                }
+
+                if (imageConfig?.aspect) {
+                    // Add to crop queue if aspect ratio is specified
+                    setCropQueue(prev => [...prev, newFileWithCrop])
+                    setCropMode('required')
+
+                    if (isSingleFile) {
+                        // Clean up existing files for single file mode
+                        value.forEach(fileWithCrop => {
+                            const preview = filePreviews.get(fileWithCrop)
+                            if (preview?.url && !fileWithCrop.origin.url) {
+                                revokeObjectURL(preview.url)
+                            }
+                        })
+                        onChange([])
+                    }
+                } else {
+                    // Add directly if no cropping needed
+                    if (isSingleFile) {
+                        // Replace existing file in single file mode
+                        value.forEach(fileWithCrop => {
+                            const preview = filePreviews.get(fileWithCrop)
+                            if (preview?.url && !fileWithCrop.origin.url) {
+                                revokeObjectURL(preview.url)
+                            }
+                        })
+                        onChange([newFileWithCrop])
+                    } else {
+                        // Add to existing files in multiple file mode
+                        let updatedFiles = [...value, newFileWithCrop]
+
+                        // Enforce max files limit
+                        if (updatedFiles.length > (fileConfig?.maxFiles ?? Infinity)) {
+                            updatedFiles = updatedFiles.slice(0, fileConfig.maxFiles)
+                        }
+
+                        onChange(updatedFiles)
+                    }
+                }
+            } catch (error) {
+                console.error("Error processing image URL:", error)
+                toast.error("Failed to process the image URL")
+            }
+        },
+        [
+            disabled,
+            loading,
+            validateAndProcessUrl,
+            imageConfig?.aspect,
+            isSingleFile,
+            value,
+            filePreviews,
+            revokeObjectURL,
+            onChange,
+            fileConfig?.maxFiles
+        ]
+    )
+
     // Effect to process the crop queue
     useEffect(() => {
         if (cropQueue.length > 0) {
@@ -257,7 +341,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
 
             // Clean up preview URL
             const preview = filePreviews.get(fileToRemove)
-            if (preview?.url) {
+            if (preview?.url && !fileToRemove.origin.url) {
                 revokeObjectURL(preview.url)
             }
 
@@ -280,14 +364,24 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
             if (active.id !== over?.id) {
                 const oldIndex = value.findIndex(
                     (fileWithCrop) => {
-                        const file = fileWithCrop.origin.file;
-                        return file && `${file.name}-${file.size}-${file.lastModified}` === active.id;
+                        if (fileWithCrop.origin.file) {
+                            const file = fileWithCrop.origin.file;
+                            return `${file.name}-${file.size}-${file.lastModified}` === active.id;
+                        } else if (fileWithCrop.origin.url) {
+                            return fileWithCrop.origin.url === active.id;
+                        }
+                        return false;
                     }
                 )
                 const newIndex = value.findIndex(
                     (fileWithCrop) => {
-                        const file = fileWithCrop.origin.file;
-                        return file && `${file.name}-${file.size}-${file.lastModified}` === over?.id;
+                        if (fileWithCrop.origin.file) {
+                            const file = fileWithCrop.origin.file;
+                            return `${file.name}-${file.size}-${file.lastModified}` === over?.id;
+                        } else if (fileWithCrop.origin.url) {
+                            return fileWithCrop.origin.url === over?.id;
+                        }
+                        return false;
                     }
                 )
 
@@ -306,8 +400,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
             if (isDraggingItem) return
 
             if (preview?.type === "image") {
-                const fileType = fileWithCrop.origin.file?.type;
-                if (fileType && fileType.startsWith('image/')) {
+                if (fileWithCrop.origin.file?.type.startsWith('image/') || fileWithCrop.origin.url) {
                     setSelectedFileForPreview(fileWithCrop)
                     setCropMode('preview')
                 }
@@ -353,7 +446,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
 
     // Crop handling
     const handleCropSave = useCallback(
-        (croppedFile: File, cropData: Crop) => {
+        (croppedFile: File | null, cropData: Crop, croppedUrl?: string) => {
             const currentFile = selectedFileForPreview;
             if (!currentFile) return;
 
@@ -362,7 +455,8 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                 const newFileWithCrop: FileWithCrop = {
                     origin: { ...currentFile.origin },
                     editted: {
-                        file: croppedFile,
+                        file: croppedFile || undefined,
+                        url: croppedUrl,
                         crop: cropData
                     }
                 };
@@ -403,7 +497,8 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                 updatedFiles[fileIndex] = {
                     origin: { ...updatedFiles[fileIndex].origin },
                     editted: {
-                        file: croppedFile,
+                        file: croppedFile || undefined,
+                        url: croppedUrl,
                         crop: cropData
                     }
                 };
@@ -418,8 +513,8 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
     // Generate sortable IDs for drag and drop
     const sortableItems = value.map(
         (fileWithCrop) => {
-            const file = fileWithCrop.origin.file;
-            if (file) {
+            if (fileWithCrop.origin.file) {
+                const file = fileWithCrop.origin.file;
                 return `${file.name}-${file.size}-${file.lastModified}`;
             }
             return fileWithCrop.origin.url || '';
@@ -440,6 +535,7 @@ export const FileUploadInput: React.FC<FileUploadInputProps> = ({
                                 onDragLeave={handleDragLeave}
                                 onDrop={handleDrop}
                                 onBrowseClick={handleBrowseClick}
+                                onUrlSubmit={processImageUrl}
                                 fileCount={value.length}
                                 maxFiles={fileConfig?.maxFiles || 1}
                                 isDraggingOver={isDraggingOver}

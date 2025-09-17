@@ -23,7 +23,7 @@ interface FilePreviewProps {
     remainingQueueCount?: number
     imageConfig?: {
         aspect?: number
-        onCropSave?: (croppedFile: File, crop: Crop) => void
+        onCropSave?: (croppedFile: File | null, crop: Crop, croppedUrl?: string) => void
         minWidth?: number
         minHeight?: number
         circularCrop?: boolean
@@ -50,6 +50,56 @@ function centerAspectCrop(
     )
 }
 
+// Helper function to generate a Base64 encoded data URL from canvas
+async function canvasToDataUrl(canvas: HTMLCanvasElement, fileType: string): Promise<string> {
+    return Promise.resolve(canvas.toDataURL(fileType, 0.85));
+}
+// Helper function to create a cropped image from a URL
+async function createCroppedImageFromUrl(
+    url: string,
+    crop: Crop,
+    imageRef: HTMLImageElement
+): Promise<string> {
+    // Create a canvas element
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+        throw new Error('Could not get canvas context');
+    }
+
+    // Calculate the pixel values for crop
+    const scaleX = imageRef.naturalWidth / imageRef.width;
+    const scaleY = imageRef.naturalHeight / imageRef.height;
+
+    const pixelCrop = {
+        x: crop.x * scaleX,
+        y: crop.y * scaleY,
+        width: crop.width * scaleX,
+        height: crop.height * scaleY,
+    };
+
+    // Set canvas dimensions
+    canvas.width = pixelCrop.width;
+    canvas.height = pixelCrop.height;
+
+    // Draw the cropped image
+    ctx.drawImage(
+        imageRef,
+        pixelCrop.x,
+        pixelCrop.y,
+        pixelCrop.width,
+        pixelCrop.height,
+        0,
+        0,
+        pixelCrop.width,
+        pixelCrop.height
+    );
+
+    // Convert canvas to data URL
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    return dataUrl;
+}
+
 export function ImageDetail({
                                 fileWithCrop,
                                 isOpen,
@@ -71,6 +121,7 @@ export function ImageDetail({
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [originalUrl, setOriginalUrl] = useState<string | null>(null)
     const [completedCrop, setCompletedCrop] = useState<PixelCrop>()
+    const [isLoadingImage, setIsLoadingImage] = useState(false)
 
     const imgRef = useRef<HTMLImageElement>(null)
     const file = fileWithCrop?.origin.file
@@ -79,6 +130,7 @@ export function ImageDetail({
     // Create and manage URLs for the original and cropped images
     useEffect(() => {
         if (!fileWithCrop) return;
+        setIsLoadingImage(true);
 
         // Set up original URL (prefer file over URL)
         let newOriginalUrl = fileWithCrop.origin.url || null;
@@ -120,6 +172,7 @@ export function ImageDetail({
 
     // Set initial crop when image loads
     const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+        setIsLoadingImage(false);
         if (!enableCrop) return;
 
         const { width, height } = e.currentTarget;
@@ -137,6 +190,12 @@ export function ImageDetail({
         }
     }, [enableCrop, imageConfig?.aspect, fileWithCrop?.editted?.crop]);
 
+    // Handle image load error
+    const onImageError = useCallback(() => {
+        setIsLoadingImage(false);
+        console.error('Image load error for:', file?.name || fileUrl);
+    }, [file?.name, fileUrl]);
+
     // Reset crop state when closing dialog
     const handleClose = useCallback(() => {
         onClose();
@@ -145,64 +204,80 @@ export function ImageDetail({
     }, [onClose, initialCrop]);
 
     // Save the cropped image
-    const saveCroppedImage = useCallback(() => {
+    const saveCroppedImage = useCallback(async () => {
         if (!crop || !imgRef.current || (!file && !fileUrl)) return;
         const cropToUse = completedCrop || crop;
 
         const image = imgRef.current;
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
 
-        // Calculate the pixel values for crop
-        const scaleX = image.naturalWidth / image.width;
-        const scaleY = image.naturalHeight / image.height;
+        try {
+            if (fileUrl) {
+                // Handle URL-based image
+                const croppedDataUrl = await createCroppedImageFromUrl(fileUrl, cropToUse, image);
 
-        const pixelCrop = {
-            x: cropToUse.x * scaleX,
-            y: cropToUse.y * scaleY,
-            width: cropToUse.width * scaleX,
-            height: cropToUse.height * scaleY,
-        };
+                // Call the callback with null for file, but pass the crop data and URL
+                if (imageConfig?.onCropSave) {
+                    imageConfig.onCropSave(null, crop, croppedDataUrl);
+                }
+            } else if (file) {
+                // Handle File-based image
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
 
-        // Set canvas dimensions
-        canvas.width = pixelCrop.width;
-        canvas.height = pixelCrop.height;
+                // Calculate the pixel values for crop
+                const scaleX = image.naturalWidth / image.width;
+                const scaleY = image.naturalHeight / image.height;
 
-        // Draw the cropped image
-        ctx.drawImage(
-            image,
-            pixelCrop.x,
-            pixelCrop.y,
-            pixelCrop.width,
-            pixelCrop.height,
-            0,
-            0,
-            pixelCrop.width,
-            pixelCrop.height
-        );
+                const pixelCrop = {
+                    x: cropToUse.x * scaleX,
+                    y: cropToUse.y * scaleY,
+                    width: cropToUse.width * scaleX,
+                    height: cropToUse.height * scaleY,
+                };
 
-        // Determine file type
-        const fileType = file?.type || 'image/jpeg';
+                // Set canvas dimensions
+                canvas.width = pixelCrop.width;
+                canvas.height = pixelCrop.height;
 
-        // Convert canvas to Blob
-        canvas.toBlob((blob) => {
-            if (!blob) return;
+                // Draw the cropped image
+                ctx.drawImage(
+                    image,
+                    pixelCrop.x,
+                    pixelCrop.y,
+                    pixelCrop.width,
+                    pixelCrop.height,
+                    0,
+                    0,
+                    pixelCrop.width,
+                    pixelCrop.height
+                );
 
-            // Create a new File object with the cropped image
-            const croppedFile = new File([blob], file?.name || 'cropped-image.jpg', {
-                type: fileType,
-                lastModified: Date.now()
-            });
+                // Determine file type
+                const fileType = file.type || 'image/jpeg';
 
-            // Call the callback to save the cropped image
-            if (imageConfig?.onCropSave) {
-                imageConfig.onCropSave(croppedFile, crop);
+                // Convert canvas to Blob
+                canvas.toBlob((blob) => {
+                    if (!blob) return;
+
+                    // Create a new File object with the cropped image
+                    const croppedFile = new File([blob], file.name || 'cropped-image.jpg', {
+                        type: fileType,
+                        lastModified: Date.now()
+                    });
+
+                    // Call the callback to save the cropped image
+                    if (imageConfig?.onCropSave) {
+                        imageConfig.onCropSave(croppedFile, crop);
+                    }
+                }, fileType);
             }
 
             // Clean up
             setEnableCrop(false);
-        }, fileType);
+        } catch (error) {
+            console.error("Error saving cropped image:", error);
+        }
     }, [crop, completedCrop, file, fileUrl, imageConfig?.onCropSave]);
 
     // Toggle crop mode
@@ -224,6 +299,12 @@ export function ImageDetail({
                 <div
                     data-vaul-no-drag={enableCrop ? '' : undefined}
                     className="relative w-full h-auto max-h-[70vh] flex items-center justify-center bg-muted rounded-lg">
+                    {isLoadingImage && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-muted/50 z-10">
+                            <div className="loading-spinner w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                    )}
+
                     {enableCrop ? (
                         <ReactCrop
                             crop={crop}
@@ -243,7 +324,9 @@ export function ImageDetail({
                                 style={{maxWidth: "100%", maxHeight: "70vh"}}
                                 className="rounded-lg w-fit object-contain"
                                 onLoad={onImageLoad}
-                                onError={() => console.error('Image load error for:', file?.name || fileUrl)}
+                                onError={onImageError}
+                                unoptimized={!!fileUrl} // For remote URLs
+                                crossOrigin="anonymous"
                             />
                         </ReactCrop>
                     ) : (
@@ -254,7 +337,10 @@ export function ImageDetail({
                             height={500}
                             style={{maxWidth: "100%", maxHeight: "70vh"}}
                             className="rounded-lg w-fit object-contain"
-                            onError={() => console.error('Image load error for:', file?.name || fileUrl)}
+                            onLoad={() => setIsLoadingImage(false)}
+                            onError={onImageError}
+                            unoptimized={!!fileUrl} // For remote URLs
+                            crossOrigin="anonymous"
                         />
                     )}
                 </div>
@@ -330,8 +416,9 @@ export function ImageDetail({
                             {file?.name || fileUrl || "File Preview"}
                         </DrawerTitle>
                         <DrawerDescription>
-                            Size: {file ? (file.size / (1024 * 1024)).toFixed(2) : "??"} MB
+                            {file ? `Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB` : "Remote Image"}
                             {file?.type && ` | Type: ${file.type}`}
+                            {!file && fileUrl && " | Type: Image URL"}
                         </DrawerDescription>
                         {headerContent}
                     </DrawerHeader>
@@ -368,8 +455,9 @@ export function ImageDetail({
                         {file?.name || fileUrl || "File Preview"}
                     </DialogTitle>
                     <DialogDescription>
-                        Size: {file ? (file.size / (1024 * 1024)).toFixed(2) : "??"} MB
+                        {file ? `Size: ${(file.size / (1024 * 1024)).toFixed(2)} MB` : "Remote Image"}
                         {file?.type && ` | Type: ${file.type}`}
+                        {!file && fileUrl && " | Type: Image URL"}
                     </DialogDescription>
                     {headerContent}
                 </DialogHeader>

@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import {FileWithCrop} from "@/app/components/file-upload/components/file-upload";
-import {Crop} from "react-image-crop";
-import {FileUploadConstants} from "@/app/components/file-upload/constants";
+import { FileWithCrop } from "@/app/components/file-upload/components/file-upload"
+import { Crop } from "react-image-crop"
+import { FileUploadConstants } from "@/app/components/file-upload/constants"
 
 interface UseFileUploadOptions {
     maxFileSize?: number // in bytes
@@ -46,6 +46,75 @@ export function useFileUpload(currentFiles: FileWithCrop[], options?: UseFileUpl
         if (fileType && fileType.startsWith("image/")) return true;
         return /\.(jpe?g|png|gif|bmp|webp|svg)$/i.test(fileName);
     }, []);
+
+    // Function to validate an image URL
+    const validateAndProcessUrl = useCallback(async (url: string): Promise<boolean> => {
+        // Check if URL is empty
+        if (!url.trim()) {
+            setErrors(['Please enter a valid URL']);
+            return false;
+        }
+
+        // Basic URL validation
+        try {
+            new URL(url);
+        } catch (e) {
+            setErrors(['Invalid URL format']);
+            return false;
+        }
+
+        // Check if URL is already in use
+        if (Array.from(filePreviewMapRef.current.keys()).some(
+            (existingFile) => existingFile.origin.url === url
+        )) {
+            setErrors([FileUploadConstants.message.existsUrl]);
+            return false;
+        }
+
+        // Check if URL is an image URL (basic check based on extension)
+        if (options?.acceptedFileTypes && options.acceptedFileTypes.length > 0) {
+            const isAccepted = options.acceptedFileTypes.some((type) => {
+                if (type.startsWith('image/')) {
+                    // For MIME types, we'll have to check URL extension
+                    const fileExtension = url.split('.').pop()?.toLowerCase();
+                    if (!fileExtension) return false;
+
+                    // Map MIME type to extension
+                    if (type === 'image/jpeg' && (fileExtension === 'jpg' || fileExtension === 'jpeg')) return true;
+                    if (type === 'image/png' && fileExtension === 'png') return true;
+                    if (type === 'image/gif' && fileExtension === 'gif') return true;
+                    if (type === 'image/webp' && fileExtension === 'webp') return true;
+                    return false;
+                } else if (type.startsWith('.')) {
+                    // Check by extension
+                    const fileExtension = '.' + url.split('.').pop()?.toLowerCase();
+                    return fileExtension === type.toLowerCase();
+                }
+                return false;
+            });
+
+            if (!isAccepted) {
+                setErrors([FileUploadConstants.message.unsupportedUrlType(options.acceptedFileTypes)]);
+                return false;
+            }
+        }
+
+        // Verify the image loads (optional but recommended)
+        try {
+            return await new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve(true);
+                img.onerror = () => {
+                    setErrors(['Could not load image from URL. Please check the URL and try again.']);
+                    resolve(false);
+                };
+                img.src = url;
+            });
+        } catch (error) {
+            setErrors(['Error loading image from URL']);
+            return false;
+        }
+    }, [options?.acceptedFileTypes]);
 
     // Function to create and store a file preview
     const createAndStorePreview = useCallback((fileWithCrop: FileWithCrop): FilePreview => {
@@ -210,6 +279,7 @@ export function useFileUpload(currentFiles: FileWithCrop[], options?: UseFileUpl
         filePreviews: filePreviewsState, // Expose the state version of file previews
         errors,
         validateAndProcessFiles,
+        validateAndProcessUrl,
         revokeObjectURL, // Expose for explicit cleanup if needed by the component
     }
 }

@@ -1,22 +1,23 @@
-
-
 export const FileUploadConstants = {
-    message: {
-        onlyOneFile: "Only 1 file allowed. New file will replace current file.",
-        maxFileSize: (fileName: string, fileSize: number, maxFileSize: number) => `File "${fileName}" is ${ (fileSize / (1024 * 1024)).toFixed(2) }MB, exceeds maximum size of ${ (maxFileSize / (1024 * 1024)).toFixed(2) }MB.`,
-        maxFiles: (maxFiles: number) => `Maximum ${maxFiles} files allowed. Limit reached`,
-        unsupportedFileType: (fileName: string, acceptedFileTypes: string[]) => `File "${fileName}" has an unsupported type. Accepted types: ${acceptedFileTypes.join(", ")}.`,
-        existsFile: (fileName: string) => `File "${fileName}" already exists.`,
-    },
     text: {
-        dropOrBrowse: "Drag & drop files here or",
-        browseFiles: "Browse Files",
-        processingFiles: "Processing files...",
-        loadingUpload: "Processing files...",
-        selectedFiles: (fileCount: number, maxFiles: number) => `Selected ${fileCount} / ${maxFiles} files`,
-        noPreviewForFileType: "No preview available for this file type.",
-        fileName: (fileName: string) => `File Name: ${fileName}`,
+        dropOrBrowse: "Drag and drop files here or browse",
+        browseFiles: "Browse files",
+        loadingUpload: "Uploading files...",
         confirmDelete: "Are you sure you want to delete this file?",
         cannotUndo: "This action cannot be undone.",
+        noPreviewForFileType: "No preview available for this file type",
+        fileName: (name: string) => `File name: ${name}`,
+        selectedFiles: (count: number, max: number | undefined) =>
+            `${count} file${count !== 1 ? 's' : ''} selected${max ? ` / ${max}` : ''}`,
+    },
+    message: {
+        maxFiles: (max: number) => `You can upload a maximum of ${max} file${max !== 1 ? 's' : ''}.`,
+        onlyOneFile: "You can only upload one file at a time.",
+        unsupportedFileType: (name: string, types: string[]) =>
+            `File "${name}" has an unsupported format. Only ${types.join(', ')} are allowed.`,
+        unsupportedUrlType: (types: string[]) =>
+            `This URL does not point to a supported image format. Only ${types.join(', ')} are allowed.`,
+        existsFile: (name: string) => `File "${name}" has already been added.`,
+        existsUrl: "This URL has already been added.",
     }
 }
